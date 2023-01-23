@@ -1,0 +1,115 @@
+---
+title: "NBA Free Agency Contract Prediction 2023"
+author: "Sumitro Datta"
+format: pdf
+editor: visual
+date: "`r Sys.Date()`"
+execute:
+  #cache: true
+  echo: true
+  warning: false
+  message: false
+---
+
+# Introduction
+
+What I wanted to do was predict what contracts this year's free agent class might get based off previous offseasons. Stars generally get star-type money on account of there being a maximum contract; but in tiers below, contracts of comparable players usually come up in discussing contract value.
+
+# Methods/Analysis
+
+## Loading Packages
+
+Let's start by loading required packages.
+
+```{r load_pkgs, results="hide"}
+packages=c("tidyverse",
+           "tidymodels",
+           "janitor", # cleaning variable names
+           "glmnet", # multinomial regression
+           "ranger", # random forest algorithm wrapper
+           "kknn", # nearest neighbors algorithm wrapper
+           "kernlab", # svm kernel wrapper
+           "vip", # variable importance
+           "zoo", # rolling/window operations
+           "matrixStats", 
+           "kableExtra", # more customization of tables
+           "RColorBrewer",
+           "ggdark", # dark background plots
+           "formattable") # easy formatting of numbers as currency & percent
+for (pkg in packages){
+  if(!require(pkg,character.only = TRUE)){
+    install.packages(pkg,repos = "http://cran.us.r-project.org")
+  }
+}
+```
+
+## Importing the Data
+
+For the statistical data, I've scraped total and advanced stats from Basketball-Reference and stored them in .csv files. This was actually part of a larger project to scrape complete statistics for teams, players and awards (the Kaggle dataset resides [here](https://www.kaggle.com/sumitrodatta/nba-aba-baa-stats). To my knowledge, my dataset is unique in that it includes BAA stats and ABA stats, which is not really of use here.
+
+The advanced stats I kept were cumulative (offensive win shares, defensive win shares and value over replacement player). For players who played on multiple teams in one season, I kept their total stats and discarded the team-specific season portions. There was an initial desire to use totals to bake in availability/body fragility, but the shortened seasons would cause the model to declare all players to be fragile and underestimate their contract.
+
+In the first iteration of this project, we scaled games played and games started to a normal distribution due to fluctuations in games played between seasons caused by the COVID-19 pandemic. We will convert the games started to a percentage of games played and we will change the games played to a percentage of maximum playable games. This maximum will differ for players who played for multiple teams in one season.
+
+```{r load_stats}
+#specify columns because otherwise birth year is read as logical
+cols_for_stats=cols(
+  .default = col_double(),
+  player = col_character(),
+  pos = col_character(),
+  lg = col_character(),
+  tm = col_character()
+)
+
+advanced<-read_csv("Data/Advanced.csv",col_types = cols_for_stats) %>%
+  select(seas_id:mp,ows:ws,vorp) %>% mutate(ws_per_48=ws/mp*48,.before="vorp")
+totals<-read_csv("Data/Player Totals.csv",col_types = cols_for_stats)
+#max games per season for players on multiple teams
+max_games_tots=totals %>% filter(tm=="TOT") %>% group_by(season,lg,tm) %>%
+  summarize(max_games_tot=max(g,na.rm = TRUE)) %>% ungroup()
+#max games per season for players on single team
+max_games=totals %>% filter(tm !="TOT") %>% group_by(season,lg) %>%
+  summarize(max_games_non_tot=max(g,na.rm = TRUE)) %>% ungroup()
+#coalesce above two into one column in totals df
+totals_enhanced=left_join(totals,max_games_tots) %>% left_join(.,max_games) %>%
+  mutate(max_games_playable=coalesce(max_games_tot,max_games_non_tot)) %>% 
+  select(-c(max_games_non_tot,max_games_tot))
+advanced_and_totals<-left_join(totals_enhanced,advanced) %>%
+  #if player played for multiple teams in season, only take total row
+  mutate(tm=ifelse(tm=="TOT","1TOT",tm)) %>% 
+  group_by(player_id,season) %>% arrange(tm) %>% slice(1) %>% 
+  mutate(tm=ifelse(tm=="1TOT","TOT",tm)) %>% 
+  arrange(season,player) %>%
+  mutate(g_percent=g/max_games_playable,gs_percent=gs/g,.before=g) %>% 
+  select(-c(gs,max_games_playable)) %>% 
+  #filter since 1997 to match w/play-by-play + faster pre-processing
+  filter(season > 1996) %>% ungroup()
+```
+
+A comment was raised on an earlier iteration regarding positional scarcity. Teams will overpay for the potential piece that puts them "over the hump", whether that be into playoff contention or the more loftier goal of championship contention. Teams might also panic to acquire a player that is deemed to be the last one in a talent tier above the remaining free agents in the same position.
+
+The play-by-play data (available since the 1997 season) keeps track of the percentage of minutes played a player has played in each traditional position (point guard, shooting guard, small forward, power forward & center). I converted the percentages to raw minutes played at each position, and summed across all teams a player played for in the same season. I felt this method was more accurate than using the "totals" row.
+
+```{r load_pbp}
+play_by_play<-read_csv("Data/Player Play By Play.csv") %>% 
+  filter(tm!="TOT") %>%
+  select(seas_id:player,mp:c_percent)
+
+#replace NA's with zeroes
+play_by_play[is.na(play_by_play)] <- 0
+
+pbp_pos_mins=play_by_play %>% 
+  #convert percents to minutes played at position
+  mutate(across(pg_percent:c_percent,~./100*mp)) %>% 
+  rename_with(.fn=~gsub(x = ., pattern = "_percent", replacement = "_mp"),
+              .cols=pg_percent:c_percent) %>%
+  #sum season minutes across different teams
+  group_by(season,player_id) %>% 
+  mutate(across(mp:c_mp,sum,.names="{col}_summed")) %>% 
+  slice(1) %>% ungroup() %>% select(-c(mp:c_mp))
+```
+
+```{r clean_environ,include=FALSE}
+rm(cols_for_stats,advanced,totals,max_games_tots,max_games,totals_enhanced,
+   play_by_play)
+```

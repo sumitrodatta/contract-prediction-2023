@@ -24,18 +24,25 @@ spotrac_bow=bow("https://www.spotrac.com/",user_agent = "Sumitro Datta",force=TR
 print(spotrac_bow)
 fa_current_yr<-scrape(nod(spotrac_bow,path="nba/free-agents/2023")) %>% html_nodes("table") %>% .[[1]] %>% html_table()
 
-cleaned_fa_current_yr= fa_current_yr %>% 
+fa_with_options=scrape(nod(spotrac_bow,path="nba/option/2023")) %>% html_nodes("table") %>% .[[1]] %>% html_table()
+
+intermed_fa_current_yr=fa_current_yr %>% 
   #filter out coaches
   filter(`Pos.` != "COA") %>% 
-  rename(Player=1,Experience=Exp,sal_2023=`2022-2023 AAV`) %>% 
-  select(Player,Type,Experience,sal_2023) %>% mutate(season=2023) %>% 
+  rename(Player=1) %>%
+  mutate(Player=str_replace_all(Player,"[\r\n]" , "")) %>%
   #remove repeat of player's last name
-  separate(Player,into=c('to_discard','player'),sep='\\s{2,100}') %>% select(-to_discard) %>%
-  arrange(player) %>% clean_names() %>% 
+  separate(Player,into=c('to_discard','Player'),sep='\\s{2,100}',extra="merge") %>% mutate(Player=str_trim(Player)) %>%
+  select(-c(to_discard,Age,"Pos.")) %>% arrange(Player)
+
+cleaned_fa_current_yr=left_join(intermed_fa_current_yr,fa_with_options) %>%
+  #options tracked more up to date, so first element in coalesce with Type column
+  mutate(Type=str_trim(word(Type)),type=coalesce(Option,Type)) %>%
+  select(player=Player,type,experience=Exp,sal_2023="Cap Hit") %>% mutate(season=2023) %>% 
   #add salary amounts for options
   mutate(contract_yrs=NA,
-         first_year_percent_of_cap=ifelse(str_detect(type,"O"),parse_number(sal_2023),NA)) %>%
-  select(-sal_2023)  %>%
+         first_year_percent_of_cap=ifelse(str_detect(type,"Player|Club"),parse_number(sal_2023),NA)) %>%
+  select(-sal_2023) %>%
   #change names to match basketball-reference data
   mutate(player=case_when(str_detect(player,"AJ Green")~"A.J. Green",
                           str_detect(player,'Bruce Brown Jr.')~'Bruce Brown',
@@ -55,7 +62,9 @@ cleaned_fa_current_yr= fa_current_yr %>%
                           str_detect(player,"Sviatoslav")~"Svi Mykhailiuk",
                           str_detect(player,"Theo")~"Théo Maledon",
                           str_detect(player,"Tillman")~"Xavier Tillman Sr.",
+                          str_detect(player,"Willy Hernan")~"Willy Hernangómez",
                           TRUE~player))
+
 
 write_csv(cleaned_fa_current_yr,"Data/Free Agents 2023.csv")
 

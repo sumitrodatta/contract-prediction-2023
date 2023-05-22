@@ -1,12 +1,10 @@
 player,type,experience,season,contract_yrs,first_year_percent_of_cap
-A.J. Lawson,RFA,1,2023,NA,NA
 Aaron Holiday,UFA,5,2023,NA,NA
-Admiral Schofield,RFA,3,2023,NA,NA
+Admiral Schofield,Club,3,2023,NA,1997238
 A.J. Green,RFA,1,2023,NA,NA
-Alec Burks,CO,11,2023,NA,10012800
+Alec Burks,Club,12,2023,NA,10489600
 Alex Len,UFA,10,2023,NA,NA
-Alondes Williams,RFA,1,2023,NA,NA
-Andre Drummond,PO,10,2023,NA,3280000
+Andre Drummond,Player,11,2023,NA,3360000
 Andre Iguodala,UFA,19,2023,NA,NA
 Anthony Lamb,RFA,3,2023,NA,NA
 Austin Reaves,RFA,2,2023,NA,NA
@@ -15,30 +13,26 @@ Ayo Dosunmu,RFA,2,2023,NA,NA
 Bismack Biyombo,UFA,12,2023,NA,NA
 Blake Griffin,UFA,13,2023,NA,NA
 Boban Marjanović,UFA,8,2023,NA,NA
-Bogdan Bogdanović,PO,5,2023,NA,18000000
 Brook Lopez,UFA,15,2023,NA,NA
-Bruce Brown,PO,4,2023,NA,6640975
-Bryce McGowens,RFA,1,2023,NA,NA
-Bryn Forbes,UFA,7,2023,NA,NA
+Bruce Brown,Player,5,2023,NA,6802950
 Buddy Boeheim,RFA,1,2023,NA,NA
 Cam Reddish,RFA,4,2023,NA,NA
 Cameron Johnson,RFA,4,2023,NA,NA
 Caris LeVert,UFA,7,2023,NA,NA
-Carlik Jones,RFA,2,2023,NA,NA
-Charles Bassey,RFA,2,2023,NA,NA
 Chimezie Metu,UFA,5,2023,NA,NA
 Christian Wood,UFA,7,2023,NA,NA
 Coby White,RFA,4,2023,NA,NA
+Cody Zeller,UFA,10,2023,NA,NA
 Collin Gillespie,RFA,1,2023,NA,NA
 Cory Joseph,UFA,12,2023,NA,NA
+D.J. Augustin,UFA,15,2023,NA,NA
 D'Angelo Russell,UFA,8,2023,NA,NA
 Dalano Banton,RFA,2,2023,NA,NA
-Damian Jones,PO,6,2023,NA,2442525
+Damian Jones,Player,7,2023,NA,2586665
 Damion Lee,UFA,6,2023,NA,NA
-Danilo Gallinari,PO,14,2023,NA,6640975
+Danilo Gallinari,Player,15,2023,NA,6802950
 Danny Green,UFA,14,2023,NA,NA
-Danuel House Jr.,PO,6,2023,NA,4207625
-DaQuan Jeffries,UFA,4,2023,NA,NA
+Danuel House Jr.,Player,7,2023,NA,4310250
 Dario Šarić,UFA,7,2023,NA,NA
 Darius Bazley,RFA,4,2023,NA,NA
 Darius Days,RFA,1,2023,NA,NA
@@ -46,99 +40,92 @@ David Duke Jr.,RFA,2,2023,NA,NA
 DeAndre Jordan,UFA,15,2023,NA,NA
 Dennis Schröder,UFA,10,2023,NA,NA
 Dennis Smith Jr.,UFA,6,2023,NA,NA
-Dereon Seabron,RFA,1,2023,NA,NA
-Derrick Jones Jr.,PO,6,2023,NA,3280000
-Derrick Rose,CO,14,2023,NA,14520730
-Devon Dotson,RFA,3,2023,NA,NA
-Didi Louzada,RFA,3,2023,NA,NA
+Derrick Jones Jr.,Player,7,2023,NA,3360000
+Derrick Rose,Club,15,2023,NA,15596339
+Dewayne Dedmon,UFA,10,2023,NA,NA
 Dillon Brooks,UFA,6,2023,NA,NA
 Dominick Barlow,RFA,1,2023,NA,NA
-Donte DiVincenzo,PO,4,2023,NA,4612500
-Draymond Green,PO,10,2023,NA,24916591
+Donte DiVincenzo,Player,5,2023,NA,4725000
+Draymond Green,Player,11,2023,NA,27586225
 Drew Eubanks,UFA,5,2023,NA,NA
+Dru Smith,RFA,1,2023,NA,NA
 Duane Washington Jr.,RFA,2,2023,NA,NA
 Dwight Powell,UFA,9,2023,NA,NA
 Dylan Windler,RFA,4,2023,NA,NA
-Eugene Omoruyi,RFA,1,2023,NA,NA
+Eugene Omoruyi,Club,2,2023,NA,1927896
 Frank Kaminsky,UFA,8,2023,NA,NA
 Frank Ntilikina,UFA,6,2023,NA,NA
-Fred VanVleet,PO,6,2023,NA,21250000
+Fred VanVleet,Player,7,2023,NA,22824074
 Gabe Vincent,UFA,4,2023,NA,NA
-Gary Trent Jr.,PO,4,2023,NA,17280000
+Gabe York,RFA,2,2023,NA,NA
+Gary Trent Jr.,Player,5,2023,NA,18560000
 George Hill,UFA,15,2023,NA,NA
 Georges Niang,UFA,7,2023,NA,NA
-Goga Bitadze,RFA,4,2023,NA,NA
+Goga Bitadze,Club,4,2023,NA,2066585
 Goran Dragić,UFA,15,2023,NA,NA
+Gorgui Dieng,UFA,10,2023,NA,NA
 Grant Williams,RFA,4,2023,NA,NA
 Hamidou Diallo,UFA,5,2023,NA,NA
 Harrison Barnes,UFA,11,2023,NA,NA
-Herbert Jones,CO,1,2023,NA,1773699
+Herbert Jones,Club,2,2023,NA,1836096
 Ibou Badji,RFA,1,2023,NA,NA
-Isaiah Livers,CO,1,2023,NA,1485625
+Isaiah Livers,Club,2,2023,NA,1836096
 Isaiah Mobley,RFA,1,2023,NA,NA
-Isaiah Roby,UFA,4,2023,NA,NA
 Ish Smith,UFA,13,2023,NA,NA
-Ish Wainright,RFA,2,2023,NA,NA
+Ish Wainright,Club,2,2023,NA,1927896
 JD Davison,RFA,1,2023,NA,NA
 Jack White,RFA,1,2023,NA,NA
 Jae Crowder,UFA,11,2023,NA,NA
 Jakob Poeltl,UFA,7,2023,NA,NA
 Jalen McDaniels,UFA,4,2023,NA,NA
 Jamal Cain,RFA,1,2023,NA,NA
-James Harden,PO,12,2023,NA,34320000
+James Harden,Player,13,2023,NA,35640000
 James Johnson,UFA,13,2023,NA,NA
 JaMychal Green,UFA,9,2023,NA,NA
+Jared Butler,RFA,2,2023,NA,NA
 Jared Rhoden,RFA,1,2023,NA,NA
-Jarrett Culver,UFA,4,2023,NA,NA
 Javonte Green,UFA,4,2023,NA,NA
 Jaxson Hayes,RFA,4,2023,NA,NA
+Jay Huff,RFA,2,2023,NA,NA
 Jaylen Nowell,UFA,4,2023,NA,NA
 Jeff Dowtin,RFA,2,2023,NA,NA
 Jeff Green,UFA,16,2023,NA,NA
 Jerami Grant,UFA,9,2023,NA,NA
-Jevon Carter,PO,4,2023,NA,2169972
-Jevon Carter,UFA,5,2023,NA,NA
+Jevon Carter,Player,5,2023,NA,2239943
 Jock Landale,RFA,2,2023,NA,NA
 Joe Ingles,UFA,9,2023,NA,NA
 John Butler,RFA,1,2023,NA,NA
-John Wall,CO,12,2023,NA,6640975
 Johnny Juzang,RFA,1,2023,NA,NA
-Jordan Clarkson,PO,8,2023,NA,12880000
-Jordan Goodwin,RFA,2,2023,NA,NA
-Josh Hart,PO,5,2023,NA,12640000
+Jordan Clarkson,Player,9,2023,NA,14260000
+Josh Hart,Player,6,2023,NA,12960000
 Josh Okogie,UFA,5,2023,NA,NA
 Josh Richardson,UFA,8,2023,NA,NA
 Juan Toscano-Anderson,UFA,4,2023,NA,NA
-Juancho Hernangómez,UFA,7,2023,NA,NA
 Julian Champagnie,RFA,1,2023,NA,NA
 Justin Holiday,UFA,10,2023,NA,NA
-Justin Jackson,UFA,6,2023,NA,NA
+Justin Lewis,RFA,1,2023,NA,NA
 Justise Winslow,UFA,8,2023,NA,NA
-Juwan Morgan,UFA,4,2023,NA,NA
 Keita Bates-Diop,UFA,5,2023,NA,NA
-Keldon Johnson,RFA,4,2023,NA,NA
 Kelly Oubre Jr.,UFA,8,2023,NA,NA
 Kendall Brown,RFA,1,2023,NA,NA
 Kendrick Nunn,UFA,5,2023,NA,NA
-Kenneth Lofton Jr.,RFA,1,2023,NA,NA
-Kenyon Martin Jr.,CO,2,2023,NA,1399637
+Kenyon Martin Jr.,Club,3,2023,NA,1930681
 Keon Ellis,RFA,1,2023,NA,NA
-Kessler Edwards,CO,1,2023,NA,1782931
-Kevin Knox,CO,4,2023,NA,3000000
+Kessler Edwards,Club,2,2023,NA,1927896
+Kevin Knox,Club,5,2023,NA,3000000
 Kevin Love,UFA,15,2023,NA,NA
-Kevon Harris,RFA,1,2023,NA,NA
-Khris Middleton,PO,10,2023,NA,35500000
-Kristaps Porziņģis,PO,6,2023,NA,31650600
-Kyle Kuzma,PO,5,2023,NA,13000000
+Khris Middleton,Player,11,2023,NA,40396552
+Kristaps Porziņģis,Player,7,2023,NA,36016200
+Kyle Kuzma,Player,6,2023,NA,13000000
 Kyrie Irving,UFA,12,2023,NA,NA
-Lamar Stevens,CO,2,2023,NA,1317656
-Leandro Bolmaro,UFA,2,2023,NA,NA
-Lindy Waters III,RFA,2,2023,NA,NA
+Lamar Stevens,Club,3,2023,NA,1930681
+Lester Quinones,RFA,1,2023,NA,NA
+Lindy Waters III,Club,2,2023,NA,1927896
 Lonnie Walker IV,UFA,5,2023,NA,NA
-Louis King,RFA,3,2023,NA,NA
+Louis King,UFA,3,2023,NA,NA
 Luka Garza,RFA,2,2023,NA,NA
-Malcolm Hill,RFA,2,2023,NA,NA
-Malik Beasley,CO,6,2023,NA,15000000
+Mac McClung,RFA,2,2023,NA,NA
+Malik Beasley,Club,7,2023,NA,16524106
 Mamadi Diakite,RFA,3,2023,NA,NA
 Markieff Morris,UFA,12,2023,NA,NA
 Mason Plumlee,UFA,10,2023,NA,NA
@@ -147,73 +134,69 @@ Matt Ryan,RFA,2,2023,NA,NA
 Matthew Dellavedova,UFA,9,2023,NA,NA
 Max Strus,UFA,4,2023,NA,NA
 McKinley Wright IV,RFA,2,2023,NA,NA
+Meyers Leonard,UFA,10,2023,NA,NA
 Mfiondu Kabengele,RFA,3,2023,NA,NA
-Micah Potter,RFA,2,2023,NA,NA
-Mike Muscala,CO,9,2023,NA,3500000
-Miles McBride,CO,1,2023,NA,1441624
-Montrezl Harrell,PO,7,2023,NA,2611758
+Michael Carter-Williams,Club,10,2023,NA,3051144
+Mike Muscala,Club,10,2023,NA,3500000
+Miles McBride,Club,2,2023,NA,1836096
+Montrezl Harrell,Player,8,2023,NA,2760026
 Moritz Wagner,UFA,5,2023,NA,NA
-Moses Brown,UFA,4,2023,NA,NA
 Moussa Diabaté,RFA,1,2023,NA,NA
-Myles Turner,UFA,8,2023,NA,NA
-Naji Marshall,CO,2,2023,NA,1140201
-Nathan Knight,CO,2,2023,NA,1916664
+Naji Marshall,Club,3,2023,NA,1930681
+Nathan Knight,Club,3,2023,NA,1997238
 Naz Reid,UFA,4,2023,NA,NA
 Neemias Queta,RFA,2,2023,NA,NA
-Nerlens Noel,CO,9,2023,NA,9240000
-Nick Richards,RFA,3,2023,NA,NA
 Nickeil Alexander-Walker,RFA,4,2023,NA,NA
 Nikola Vučević,UFA,12,2023,NA,NA
+Olivier Sarr,RFA,2,2023,NA,NA
 Omer Yurtseven,RFA,3,2023,NA,NA
 Orlando Robinson,RFA,1,2023,NA,NA
 Oshae Brissett,UFA,4,2023,NA,NA
-Otto Porter Jr.,PO,9,2023,NA,6150000
 Patrick Beverley,UFA,11,2023,NA,NA
 Paul Reed,RFA,3,2023,NA,NA
 P.J. Washington,RFA,4,2023,NA,NA
 Raul Neto,UFA,8,2023,NA,NA
 Reggie Jackson,UFA,12,2023,NA,NA
-R.J. Hampton,UFA,3,2023,NA,NA
 Robin Lopez,UFA,15,2023,NA,NA
 Rodney McGruder,UFA,7,2023,NA,NA
 Romeo Langford,RFA,4,2023,NA,NA
 Ron Harper Jr.,RFA,1,2023,NA,NA
-Rudy Gay,PO,16,2023,NA,6184500
+Rudy Gay,Player,17,2023,NA,6479000
 Rui Hachimura,RFA,4,2023,NA,NA
 Russell Westbrook,UFA,15,2023,NA,NA
-Ryan Arcidiacono,UFA,6,2023,NA,NA
+Saben Lee,RFA,3,2023,NA,NA
 Sandro Mamukelashvili,RFA,2,2023,NA,NA
 Scotty Pippen Jr.,RFA,1,2023,NA,NA
-Serge Ibaka,UFA,14,2023,NA,NA
 Seth Curry,UFA,10,2023,NA,NA
 Shake Milton,UFA,5,2023,NA,NA
-Stanley Johnson,UFA,8,2023,NA,NA
 Svi Mykhailiuk,UFA,5,2023,NA,NA
 T.J. Warren,UFA,9,2023,NA,NA
 Taj Gibson,UFA,14,2023,NA,NA
-Talen Horton-Tucker,PO,3,2023,NA,10260000
+Talen Horton-Tucker,Player,4,2023,NA,11020000
 Terence Davis,UFA,4,2023,NA,NA
 Terrence Ross,UFA,11,2023,NA,NA
+Terry Taylor,RFA,2,2023,NA,NA
 Thanasis Antetokounmpo,UFA,5,2023,NA,NA
 Théo Maledon,RFA,3,2023,NA,NA
 Théo Maledon,UFA,5,2023,NA,NA
 Thomas Bryant,UFA,6,2023,NA,NA
-Tony Bradley,UFA,6,2023,NA,NA
 Torrey Craig,UFA,6,2023,NA,NA
 Tre Jones,RFA,3,2023,NA,NA
 Trent Forrest,RFA,3,2023,NA,NA
-Trevelin Queen,RFA,2,2023,NA,NA
 Trevor Hudgins,RFA,1,2023,NA,NA
 Trevor Keels,RFA,1,2023,NA,NA
 Trey Lyles,UFA,8,2023,NA,NA
+Tristan Thompson,UFA,12,2023,NA,NA
 Troy Brown Jr.,UFA,5,2023,NA,NA
 Ty Jerome,UFA,4,2023,NA,NA
 Udoka Azubuike,UFA,3,2023,NA,NA
 Udonis Haslem,UFA,20,2023,NA,NA
-Vernon Carey Jr.,CO,2,2023,NA,2193761
-Victor Oladipo,PO,9,2023,NA,9100000
+Victor Oladipo,Player,10,2023,NA,9450000
 Wenyen Gabriel,UFA,5,2023,NA,NA
 Wesley Matthews,UFA,14,2023,NA,NA
 Will Barton,UFA,11,2023,NA,NA
-Xavier Tillman Sr.,CO,2,2023,NA,1533534
+Willie Cauley-Stein,UFA,8,2023,NA,NA
+Willy Hernangómez,Club,7,2023,NA,2559942
+Xavier Moon,RFA,2,2023,NA,NA
+Xavier Tillman Sr.,Club,3,2023,NA,1930681
 Yuta Watanabe,UFA,5,2023,NA,NA

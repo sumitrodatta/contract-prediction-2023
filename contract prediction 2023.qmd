@@ -32,10 +32,10 @@ packages=c("tidyverse",
            "vip", # variable importance
            "zoo", # rolling/window operations
            "matrixStats", 
-           "kableExtra", # more customization of tables
            "RColorBrewer",
+           "readxl", #read excel files
            "ggdark", # dark background plots
-           "formattable") # easy formatting of numbers as currency & percent
+           "gt") # table creator (replace kableExtra & formattable)
 for (pkg in packages){
   if(!require(pkg,character.only = TRUE)){
     install.packages(pkg,repos = "http://cran.us.r-project.org")
@@ -45,7 +45,7 @@ for (pkg in packages){
 
 ## Importing the Data
 
-For the statistical data, I've scraped total and advanced stats from Basketball-Reference and stored them in .csv files. This was actually part of a larger project to scrape complete statistics for teams, players and awards (the Kaggle dataset resides [here](https://www.kaggle.com/sumitrodatta/nba-aba-baa-stats). To my knowledge, my dataset is unique in that it includes BAA stats and ABA stats, which is not really of use here.
+For the statistical data, I've scraped total and advanced stats from Basketball-Reference and stored them in .csv files. This was actually part of a larger project to scrape complete statistics for teams, players and awards (the Kaggle dataset resides [here](https://www.kaggle.com/sumitrodatta/nba-aba-baa-stats)). To my knowledge, my dataset is unique in that it includes BAA stats and ABA stats, which is not really of use here.
 
 The advanced stats I kept were cumulative (offensive win shares, defensive win shares and value over replacement player). For players who played on multiple teams in one season, I kept their total stats and discarded the team-specific season portions. There was an initial desire to use totals to bake in availability/body fragility, but the shortened seasons would cause the model to declare all players to be fragile and underestimate their contract.
 
@@ -109,7 +109,123 @@ pbp_pos_mins=play_by_play %>%
   slice(1) %>% ungroup() %>% select(-c(mp:c_mp))
 ```
 
+Another concern that I noticed is that top tier players have depressed contract predictions. Due to the smaller number of players on the court and smaller rosters in general, an individual player's importance is heightened compared to other team sports. As such, elite players get paid the most money. To identify elite players, I brought in end-of-season All-Defense and All-NBA Team voting.
+
+There are two All-Defense teams made up of 5 players each, honoring the top defensive players in the league. They have been voted on by media since 2014. Prior to that, NBA head coaches voted on the All-Defensive team recipients, with the caveat that they could not vote for players on their own team. Players get 2 points for a first-team vote, and 1 point for a second-team vote. There are three All-NBA teams made of 5 players each, honoring the top overall players in the league. The All-NBA teams are voted on by media, and were expanded to the current 3-team setup in 1989. Players get 5 points for a first-team vote, 3 points for a second-team vote and 1 point for a third-team vote. To normalize differences in total points received, I calculated a player's vote share by dividing their points received by the maximum points available (essentially if every possible voter gave that player a first-team vote).
+
+The All-NBA voting is also pulled from Basketball-Reference from each season's awards voting section (here's [2023](https://www.basketball-reference.com/awards/awards_2023.html#all_leading_all_nba) for an example). Basketball-Reference very recently added All-Defense voting, so I compiled it myself. Since 2014, the NBA has published all voter ballots and I've scraped those PDF files for a separate [project](https://www.kaggle.com/datasets/sumitrodatta/nba-endofseason-voting-ballots-20142020). To get earlier results, I relied on [Patricia Bender's site](https://www.eskimo.com/~pbender/index.html) as well as newspapers.com user [iknowball](https://www.newspapers.com/profile/iknowball?tab=clippings).
+
+```{r all_d_and_all_nba_shares}
+all_defense_voting_since_2014=read_csv("Data/all-def.csv") %>%
+  pivot_longer(cols=first_fwd:second_g_2,names_to="points",values_to="player") %>% 
+  #2023 awards have no comma between last name & first name
+  mutate(player=if_else(year==2023,str_replace(player," ",", "),player)) %>%
+  mutate(player=gsub("\\(.*","",player)) %>% 
+  mutate(player=gsub("--.*","",player)) %>% mutate(player=str_trim(player)) %>% 
+  separate(player,into=c("last","first"),sep=", ",convert = TRUE) %>%
+  unite("player",c(first,last),sep=" ",na.rm=TRUE) %>%
+  mutate(points_given=case_when(
+    (str_detect(points,"first"))~2,
+    (str_detect(points,"second"))~1,
+  )) %>%
+  mutate(player=case_when(
+    #3 players in all-def 2015 have one dash rather than two
+    str_detect(player," - IND")~"George Hill",
+    str_detect(player," - SA")~"Danny Green",
+    str_detect(player," - Mil")~"Giannis Antetokounmpo",
+    str_detect(player,"PJ Tucker")~"P.J. Tucker",
+    str_detect(player,"TJ McConnell")~"T.J. McConnell",
+    str_detect(player,"Ginobili")~"Manu Ginóbili",
+    str_detect(player,"Porzingis")~"Kristaps Porziņģis",
+    str_detect(player,"Jokic")~"Nikola Jokić",
+    str_detect(player,"Doncic")~"Luka Dončić",
+    str_detect(player,"Schroder")~"Dennis Schröder",
+    str_detect(player,"Robert Williams III")~"Robert Williams",
+    str_detect(player,"Michael Jr. Porter")~"Michael Porter Jr.",
+    str_detect(player,"Jr. Jaren Jackson")~"Jaren Jackson Jr.",
+    str_detect(player,"O.G. Anunoby")~"OG Anunoby",
+    TRUE~player)) %>%
+  #replace non-ascii dashes
+  mutate(player=str_replace(player,"\u2010","-")) %>% 
+  mutate(vote_position=word(points,start=2,sep="_")) %>%
+  select(-points) %>% rename(season=year)
+
+all_d_vote_shares_since_2014=all_defense_voting_since_2014 %>% 
+  #points maximum is number of ballots * 2 points for first-team vote
+  #number of ballots is number of choices divided by 10 (5 1st team, 5 2nd team)
+  group_by(season) %>% mutate(pts_max=n()/10*2) %>%
+  group_by(season,player,pts_max) %>% 
+  summarize(pts_won=sum(points_given),
+            x1st_tm=sum(points_given==2),
+            x2nd_tm=sum(points_given==1)) %>% 
+  ungroup() %>% mutate(share=pts_won/pts_max)
+
+all_d_vote_shares_until_2013=read_excel("Data/All-Defense Voting < 2013.xlsx")
+
+all_d_vote_shares_since_1991=bind_rows(all_d_vote_shares_since_2014,
+                                       all_d_vote_shares_until_2013) %>%
+  select(season,player,all_defense_share=share)
+
+all_nba_voting_shares=read_csv("Data/End of Season Teams (Voting).csv") %>% 
+  filter(type=="All-NBA") %>% 
+  select(season,player,all_nba_share=share)
+```
+
 ```{r clean_environ,include=FALSE}
 rm(cols_for_stats,advanced,totals,max_games_tots,max_games,totals_enhanced,
-   play_by_play)
+   play_by_play,all_defense_voting_since_2014,
+   all_d_vote_shares_since_2014,all_d_vote_shares_until_2013)
 ```
+
+I decided to completely revamp the free agency training set. Rather than scrape the Basketball-Reference [free agents tracker](https://www.basketball-reference.com/friv/free_agents.fcgi), I decided to scrape the [Pro Sports Transaction Archive](https://www.prosportstransactions.com). The benefits to this decision were twofold:
+
+-   the Basketball-Reference free agents tracker only goes back to the 2016 offseason. The Pro Sports Transaction Archive allows me to add free agency periods before then.
+
+-   Basketball-Reference would mostly include players that were on team rosters on the final day of the regular season, excluding players who were waived during the season.
+
+I started the new training set from the 2012 offseason, which was the first offseason of the new collective bargaining agreement. I kept the logic fairly similar from the previous training set. Players who signed from overseas and players who retired before the start of the next season were not included as free agents. The former would have no statistical data to pull, and the latter would artificially inflate the number of players who didn't sign a contract. Players whose salary & contract years were set to zero either went overseas, had explicitly non-guaranteed first years in their contracts (training camp deals, two ways, ten days, exhibit 10s), or didn't end up signing a contract before the season started. Option years & partially guaranteed years were included in the calculation of contract years; I looked at it as both player & team intending to see out the contract. The majority of year 1 salaries were gathered using Spotrac. Other minor sources include Basketball-Insiders, Basketball-Reference and Patricia Bender.
+
+A couple of new wrinkles while expanding the training set:
+
+-   some players would sign multiple contracts, either due to failing a physical and voiding a contract, or converting from a non-guaranteed contract to a guaranteed one. I decided to take the first contract signed, as future contracts would have been based on additional information.
+
+-   how to handle restricted free agents whose offers were rescinded or not even offered? I could take the status as of contract signing (which would decrease the amount of RFA data to train on) or I could take the status as of the start of free agency (which could be misleading, as the player might not have gotten the same contract as an RFA). I decided on the former.
+
+```{r load_train}
+past_free_agents<-read_csv("Data/Past Free Agents.csv")
+```
+
+The next file I used was salary cap history, scraped from RealGM. To somewhat normalize comparisons across years, I converted the first year salary to a percentage of the salary cap.
+
+```{r load_cap_hist}
+#subtract one from year to match up with offseason in which contract was signed
+salary_cap_hist<-read_csv("Data/Salary Cap History.csv") %>% mutate(season=season-1)
+#create variable of first year salary as percentage of cap
+#easier to compare across years
+past_free_agents<-past_free_agents %>% select(-c(terms,Source)) %>% 
+  left_join(.,salary_cap_hist) %>% 
+  mutate(first_year_percent_of_cap=yr_1_salary/cap) %>% 
+  select(-c(yr_1_salary,cap))
+```
+
+Quick question, who do you think has the highest recorded salary cap percentage in the dataset? If you chose one of LeBron James, Kevin Durant or Stephen Curry, you'd probably be surprised to find out that you're incorrect! The highest percentage belongs to Carmelo Anthony, who re-signed with the New York Knicks in 2014 for a first-year salary cap percentage of 35.61%. Due to an exception that ["the maximum salary in the first season of a contract is never less than 105% of the salary in the last year of the player's previous contract"](http://www.cbafaq.com/salarycap.htm#Q23), Carmelo was able to surpass the 35% league-wide maximum salary.
+
+The last file loaded is our evaluation set: the 2023 free agent class, retrieved from Spotrac. I had to edit this dataset to match the Basketball-Reference names (mainly adding diacritics to European names). In addition, I filtered out players with options. Players who decline player options and players who have their team options declined with more than 3 years of experience become unrestricted free agents. Players with less than or equal to 3 years of experience and a declined team option become restricted free agents. I'll use this fact to see which players & teams might decline their option.
+
+```{r load_eval}
+current_fa<-read_csv("Data/Free Agents 2023.csv")
+#separate out options to compare what players options get if declined
+current_fa_options<-current_fa %>% filter(str_detect(type,"Player|Club")) %>% 
+  select(-c(experience,contract_yrs)) %>% 
+  rename(option_type=type,option_amt=first_year_percent_of_cap)
+#make player options all declined (UFA's)
+#make club options ufa or rfa depending on exp
+current_fa<-current_fa %>%
+  mutate(type=case_when((type=="Player"|(type=="Club" & experience >= 4))~"UFA",
+                        (type=="Club" & experience < 4)~"RFA",
+                        TRUE~type)) %>% 
+  group_by(player) %>% select(-experience) %>% slice(1) %>% ungroup() %>% 
+  mutate(first_year_percent_of_cap=NA)
+```
+
+In the GitHub repository where this project is located, a file called `free agents.r` has more details on exactly how I scraped the train set, evaluation set and the salary cap history.

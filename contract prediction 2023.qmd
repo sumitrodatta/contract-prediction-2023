@@ -172,9 +172,10 @@ all_nba_voting_shares=read_csv("Data/End of Season Teams (Voting).csv") %>%
 ```
 
 ```{r clean_environ,include=FALSE}
-rm(cols_for_stats,advanced,totals,max_games_tots,max_games,totals_enhanced,
-   play_by_play,all_defense_voting_since_2014,
-   all_d_vote_shares_since_2014,all_d_vote_shares_until_2013)
+rm(packages,pkg,cols_for_stats,
+   advanced,totals,max_games_tots,max_games,totals_enhanced,play_by_play,
+   all_defense_voting_since_2014,all_d_vote_shares_since_2014,
+   all_d_vote_shares_until_2013)
 ```
 
 I decided to completely revamp the free agency training set. Rather than scrape the Basketball-Reference [free agents tracker](https://www.basketball-reference.com/friv/free_agents.fcgi), I decided to scrape the [Pro Sports Transaction Archive](https://www.prosportstransactions.com). The benefits to this decision were twofold:
@@ -229,3 +230,65 @@ current_fa<-current_fa %>%
 ```
 
 In the GitHub repository where this project is located, a file called `free agents.r` has more details on exactly how I scraped the train set, evaluation set and the salary cap history.
+
+## Retrospective on Last Year's Results
+
+Before getting into pre-processing, we'll take a look at last year's results and see how the models performed.
+
+```{r last_years_results_load, echo=FALSE}
+non_options=read_csv("https://raw.githubusercontent.com/sumitrodatta/contract-prediction-2022/master/Non-Option%20Contracts.csv")
+options=read_csv("https://raw.githubusercontent.com/sumitrodatta/contract-prediction-2022/master/Options.csv")
+combined_predictions=bind_rows(non_options,options) %>% 
+  clean_names() %>% 
+  #take out totals
+  select(-starts_with("total")) %>%
+  select(-c(age,type)) %>% 
+  mutate(across(ends_with("cap_percent"),~parse_number(.)/100)) %>%
+  mutate(x2021_option=parse_number(x2021_option)) %>%
+  #correct names
+  mutate(player=case_when(str_detect(player,"Otto")~"Otto Porter Jr.",
+                          str_detect(player,'Clax')~"Nic Claxton",
+                          str_detect(player,"Danuel")~"Danuel House Jr.",
+                          str_detect(player,"Lonnie")~"Lonnie Walker IV",
+                          str_detect(player,"Woodard")~"Robert Woodard II",
+                          TRUE~player)) %>%
+  #join predictions with actual
+  left_join(.,past_free_agents %>% filter(season==2022)) %>%
+  select(-c(season,option_type,type)) %>% 
+  #filter out players who either picked up player option or had team option picked up
+  filter(is.na(x2021_option)|!is.na(contract_yrs)) %>%
+  select(-x2021_option) %>%
+  replace_na(list(contract_yrs=0,first_year_percent_of_cap=0)) %>%
+  mutate(contract_yrs=factor(contract_yrs,levels=0:5),
+         yrs_y1s2=factor(yrs_y1s2,levels=0:5),
+         yrs_s1y2=factor(yrs_s1y2,levels=0:5)) %>%
+  mutate(across(contains("cap"),~round(.,digits=4)))
+rm(non_options,options)
+```
+
+```{r accuracy,echo=FALSE}
+y1s2_yr_acc=round(accuracy(combined_predictions,truth=contract_yrs,estimate=yrs_y1s2) %>% pull(.estimate)*100,2)
+s1y2_yr_acc=round(accuracy(combined_predictions,truth=contract_yrs,estimate=yrs_s1y2) %>% pull(.estimate)*100,2)
+```
+
+The years accuracy of the years-first model was `r y1s2_yr_acc`%, while the years accuracy of the salary-first model was `r s1y2_yr_acc`%. The 2020 models were at 49-51% accuracy, but the 2021 models were at 58-60% accuracy. There's been a decline in accuracy after the initial improvement in 2021. Here's some confusion matrices on how each model handled the prediction of contract years.
+
+```{r years_confusion_matrix,echo=FALSE}
+#| layout-ncol: 2
+y1_yr_heatmap=combined_predictions %>%
+  conf_mat(data=.,truth=contract_yrs,estimate=yrs_y1s2) %>%
+  autoplot(type="heatmap") +
+  ggtitle("Actual Contract Years vs Predicted Contract Years",
+          subtitle="Years-First Model")
+ggsave(filename = "Images/Years Predict v Actual, Y1S2 Model.png",plot=y1_yr_heatmap)
+s1_yr_heatmap=combined_predictions %>%
+  conf_mat(data=.,truth=contract_yrs,estimate=yrs_s1y2) %>%
+  autoplot(type="heatmap",) +
+  ggtitle("Actual Contract Years vs Predicted Contract Years",
+          subtitle="Salary-First Model")
+ggsave(filename = "Images/Years Predict v Actual, S1Y2 Model.png",plot=s1_yr_heatmap)
+y1_yr_heatmap
+s1_yr_heatmap
+```
+
+The incorrect predictions were pessimistic, in that they skewed toward predicting less years than received as evidenced by the sum of the upper triangle being greater than the lower triangle (models forecasting no contract for players who received a one-year contract, one year for players who got two years, etc).

@@ -283,7 +283,7 @@ y1_yr_heatmap=combined_predictions %>%
 ggsave(filename = "Images/Years Predict v Actual, Y1S2 Model.png",plot=y1_yr_heatmap)
 s1_yr_heatmap=combined_predictions %>%
   conf_mat(data=.,truth=contract_yrs,estimate=yrs_s1y2) %>%
-  autoplot(type="heatmap",) +
+  autoplot(type="heatmap") +
   ggtitle("Actual Contract Years vs Predicted Contract Years",
           subtitle="Salary-First Model")
 ggsave(filename = "Images/Years Predict v Actual, S1Y2 Model.png",plot=s1_yr_heatmap)
@@ -292,3 +292,95 @@ s1_yr_heatmap
 ```
 
 The incorrect predictions were pessimistic, in that they skewed toward predicting less years than received as evidenced by the sum of the upper triangle being greater than the lower triangle (models forecasting no contract for players who received a one-year contract, one year for players who got two years, etc).
+
+Here are the worst misses for both models.
+
+```{r last_yr_extreme_yr_misses,echo=FALSE}
+#| layout-ncol: 2
+yrs_s1y2_misses=combined_predictions %>% 
+                        arrange(desc(contract_yrs),desc(yrs_s1y2)) %>%
+  mutate(abs_error_y1s2_yrs=abs(as.numeric(contract_yrs)-as.numeric(yrs_y1s2))) %>% 
+  slice_max(abs_error_y1s2_yrs,n=5) %>% select(player,yrs_y1s2,contract_yrs)
+yrs_y1s2_misses=combined_predictions %>% 
+                        arrange(desc(contract_yrs),desc(yrs_y1s2)) %>%
+  mutate(abs_error_s1y2_yrs=abs(as.numeric(contract_yrs)-as.numeric(yrs_s1y2))) %>% 
+  slice_max(abs_error_s1y2_yrs,n=5) %>% select(player,yrs_s1y2,contract_yrs)
+gt(yrs_s1y2_misses)
+gt(yrs_y1s2_misses)
+```
+
+On June 29, 2022 (one day before NBA free agency opened), Bridges was arrested in Los Angeles for [felony domestic violence](https://www.latimes.com/california/story/2022-06-29/nba-miles-bridges-reportedly-arrested-in-los-angeles-on-suspicion-of-domestic-violence) and was released on \$130,000 bond. Beal was the main reason I decided to bring in end-of-season team voting shares, because I immediately knew he would be getting more than 2 years in a contract offer. Čančar and Hauser re-signed with the Nuggets and Celtics respectively.
+
+```{r last_yr_results,echo=FALSE}
+y1_rmse=rmse(combined_predictions,
+             truth=first_year_percent_of_cap,
+             estimate=y1s2_cap_percent) %>% 
+  pull(.estimate)
+s1_rmse=rmse(combined_predictions,
+             truth=first_year_percent_of_cap,
+             estimate=s1y2_cap_percent) %>%
+  pull(.estimate)
+```
+
+Let's shift our focus to the salary predictions. First, the residual mean squared error of the years-first model was `r y1_rmse`, while the salary-first model had an RMSE of `r s1_rmse`. However, this includes Miles Bridges not receiving a contract when he was predicted for 23.55% of the salary cap under Y1S2 and 21.92% of the salary cap under S1Y2.
+
+```{r last_yr_results_wo_miles_bridges,echo=FALSE}
+y1_rmse_revised=rmse(combined_predictions %>% filter(player != "Miles Bridges"),
+             truth=first_year_percent_of_cap,
+             estimate=y1s2_cap_percent) %>% 
+  pull(.estimate)
+s1_rmse_revised=rmse(combined_predictions %>% filter(player != "Miles Bridges"),
+             truth=first_year_percent_of_cap,
+             estimate=s1y2_cap_percent) %>%
+  pull(.estimate)
+```
+
+Removing Bridges, the new years-first RMSE is `r y1_rmse_revised`, while the new salary-first RMSE is `r s1_rmse_revised`. Last year's Y1 RMSE was 0.0245718 and S1 RMSE was 0.0248204. Even excluding the outlier of Bridges, the RMSEs are greater.
+
+As we did with the years models, let's look at the most extreme salary misses.
+
+```{r last_yr_extreme_sal_misses,echo=FALSE}
+sal_y1s2_misses=combined_predictions %>% 
+  filter(player != "Miles Bridges") %>%
+  mutate(abs_error_y1s2_salary=abs(first_year_percent_of_cap - y1s2_cap_percent)) %>% 
+  slice_max(abs_error_y1s2_salary,n=10) %>%
+  select(player,y1s2_cap_percent,first_year_percent_of_cap)
+sal_s1y2_misses=combined_predictions %>% 
+  filter(player != "Miles Bridges") %>%
+  mutate(abs_error_s1y2_salary=abs(first_year_percent_of_cap - s1y2_cap_percent)) %>% 
+  slice_max(abs_error_s1y2_salary,n=10) %>%
+  select(player,s1y2_cap_percent,first_year_percent_of_cap)
+gt(sal_y1s2_misses) %>% fmt_percent(columns=y1s2_cap_percent:first_year_percent_of_cap)
+gt(sal_s1y2_misses) %>% fmt_percent(columns=s1y2_cap_percent:first_year_percent_of_cap)
+```
+
+Common players missed on both models are Bradley Beal, Anfernee Simons, Deandre Ayton, Montrezl Harrell & Marvin Bagley III. Simons, Ayton & Bagley were all restricted free agents. Simons re-upped with the Trail Blazers after stepping into the scoring void left by CJ McCollum in his trade to the Pelicans in February 2022. Ayton signed an offer sheet with the Pacers that was subsequently matched by the Suns. Bagley was never able to live up to the billing of being the number 2 overall pick in 2019, especially with the 3 picks immediately after him being Luka Doncic (4x First-Team All-NBA, 4x All-Star), Jaren Jackson Jr. (2x First-Team All-Defense, 1x Defensive Player of the Year, 1x All-Star) and Trae Young (1x Third-Team All-NBA, 2x All-Star). He was traded from the Kings to the Pistons in January 2022, and re-signed with the Pistons in the offseason. Harrell signed with Philadelphia to back up eventual 2023 Most Valuable Player Joel Embiid and pursue a championship.
+
+On a more positive note, here's some players on which the models were very close on. We'll restrict our view to contracts that had a first year salary that was greater than 5% of the salary cap, as it's easier to get close to minimum & near-minimum contract amounts.
+
+```{r last_yr_extreme_sal_close,echo=FALSE}
+sal_y1s2_close=combined_predictions %>% 
+  filter(contract_yrs %in% c(1:5) & 
+           yrs_y1s2 %in% c(1:5) & 
+           first_year_percent_of_cap > 0.05) %>%
+  mutate(abs_error_y1s2_salary=abs(first_year_percent_of_cap - y1s2_cap_percent)) %>% 
+  slice_min(abs_error_y1s2_salary,n=10) %>%
+  select(player,y1s2_cap_percent,first_year_percent_of_cap)
+sal_s1y2_close=combined_predictions %>% 
+  filter(contract_yrs %in% c(1:5) & 
+           yrs_y1s2 %in% c(1:5) &
+           first_year_percent_of_cap > 0.05) %>%
+  mutate(abs_error_s1y2_salary=abs(first_year_percent_of_cap - s1y2_cap_percent)) %>% 
+  slice_min(abs_error_s1y2_salary,n=10) %>%
+  select(player,s1y2_cap_percent,first_year_percent_of_cap)
+gt(sal_y1s2_close) %>% fmt_percent(columns=y1s2_cap_percent:first_year_percent_of_cap)
+gt(sal_s1y2_close) %>% fmt_percent(columns=s1y2_cap_percent:first_year_percent_of_cap)
+```
+
+Kyle Anderson is the first instance in the 3 years of predictions of an exact match with the actual salary percent. Players on both top 10s are P.J. Tucker, Delon Wright, Isaiah Hartenstein, Jae'Sean Tate and Cody Martin. Only one of the top 10 closest salary hits exceeds 10% as an actual first year salary percentage.
+
+```{r remove_retrospective_vars,include=FALSE}
+rm(y1_rmse,s1_rmse,y1_yr_heatmap,s1_yr_heatmap,s1y2_yr_acc,y1s2_yr_acc,combined_predictions,
+   sal_s1y2_close,sal_s1y2_misses,sal_y1s2_close,sal_y1s2_misses,yrs_s1y2_misses,
+   yrs_y1s2_misses,s1_rmse_revised,y1_rmse_revised)
+```

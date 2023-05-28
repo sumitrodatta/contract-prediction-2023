@@ -115,7 +115,7 @@ There are two All-Defense teams made up of 5 players each, honoring the top defe
 
 The All-NBA voting is also pulled from Basketball-Reference from each season's awards voting section (here's [2023](https://www.basketball-reference.com/awards/awards_2023.html#all_leading_all_nba) for an example). Basketball-Reference very recently added All-Defense voting, so I compiled it myself. Since 2014, the NBA has published all voter ballots and I've scraped those PDF files for a separate [project](https://www.kaggle.com/datasets/sumitrodatta/nba-endofseason-voting-ballots-20142020). To get earlier results, I relied on [Patricia Bender's site](https://www.eskimo.com/~pbender/index.html) as well as newspapers.com user [iknowball](https://www.newspapers.com/profile/iknowball?tab=clippings).
 
-```{r all_d_and_all_nba_shares}
+```{r load_all_d_and_all_nba_shares}
 all_defense_voting_since_2014=read_csv("Data/all-def.csv") %>%
   pivot_longer(cols=first_fwd:second_g_2,names_to="points",values_to="player") %>% 
   #2023 awards have no comma between last name & first name
@@ -168,7 +168,7 @@ all_d_vote_shares_since_1991=bind_rows(all_d_vote_shares_since_2014,
 
 all_nba_voting_shares=read_csv("Data/End of Season Teams (Voting).csv") %>% 
   filter(type=="All-NBA") %>% 
-  select(season,player,all_nba_share=share)
+  select(season,player,seas_id,player_id,all_nba_share=share)
 ```
 
 ```{r clean_environ,include=FALSE}
@@ -383,4 +383,106 @@ Kyle Anderson is the first instance in the 3 years of predictions of an exact ma
 rm(y1_rmse,s1_rmse,y1_yr_heatmap,s1_yr_heatmap,s1y2_yr_acc,y1s2_yr_acc,combined_predictions,
    sal_s1y2_close,sal_s1y2_misses,sal_y1s2_close,sal_y1s2_misses,yrs_s1y2_misses,
    yrs_y1s2_misses,s1_rmse_revised,y1_rmse_revised)
+```
+
+## Data Exploration and Visualizations
+
+Before we train models, let's see how some of the predictors and some of the targets interact. First, let's see how our targets correlate with each other. I've created a box and whisker plot, as well as added the points themselves in a transparent layer with some random variation to differentiate between points.
+
+```{r targets_corr, echo=FALSE, fig.align='center',out.width="100%"}
+set.seed(1) #to make jitter reproducible
+corr_yrs_sal=round(
+    cor(past_free_agents$contract_yrs,
+    past_free_agents$first_year_percent_of_cap),4)
+yrs_vs_sal=past_free_agents %>% 
+  ggplot(aes(x=factor(contract_yrs),y=first_year_percent_of_cap)) + 
+  geom_boxplot() + geom_jitter(alpha=0.1,width=0.2) + 
+  labs(x="Contract Years",y="First Year Cap %") +
+  scale_y_continuous(labels = scales::percent) +
+  annotate("text",x=1.25,y=0.3,label=paste0("Correlation Coeff:\n",corr_yrs_sal)) +
+  dark_theme_gray()
+ggsave(filename = "Images/Contract Years Against First Year Salary.png",plot=yrs_vs_sal,
+       width=7.5,height=3.75,units = "in")
+knitr::include_graphics("Images/Contract Years Against First Year Salary.png")
+```
+
+The correlation coefficient is `r corr_yrs_sal*100`%, which shows that the two targets are strongly and positively correlated. The median value of the first year cap % (middle line in each box) increases with an increase in contract length. The highest increase in first year cap % is between a 4-year and 5-year contract.
+
+Next, let's see if an all-encompassing advanced statistic has a relationship with first year cap percentage. Win Shares represent how much a player has contributed to his team's wins by comparing his output to a marginal player. Higher win shares generally indicate a better player.
+
+```{r ws_vs_salary, echo=FALSE, fig.align='center',out.width="100%"}
+free_agent_ws=left_join(past_free_agents,
+                        advanced_and_totals %>% select(seas_id:birth_year,ws)) %>%
+  #multiple free agents with same name in same season
+  filter(!(player=="Tony Mitchell" & birth_year==1992 & season==2014)) %>%
+  filter(!(player=="Chris Johnson" & birth_year==1985 & season==2013))
+corr_ws_sal=round(
+    cor(free_agent_ws$contract_yrs,
+    free_agent_ws$ws),4)
+ws_vs_sal=free_agent_ws %>%
+  ggplot(aes(x=first_year_percent_of_cap,y=ws,color=factor(contract_yrs))) + 
+  geom_point() +
+  scale_colour_brewer(palette="RdYlGn") +
+  labs(x="First Year Cap %",y="Win Shares",color="Contract Years") +
+  annotate("text",x=0.05,y=12.5,
+           label=paste0("Correlation Coeff:\n",corr_ws_sal)) +
+  dark_theme_gray()
+ggsave(filename = "Images/Win Shares Against First Year Salary.png",plot=ws_vs_sal,
+       width=7.5,height=3.75,units = "in")
+knitr::include_graphics("Images/Win Shares Against First Year Salary.png")
+```
+
+With a correlation coefficient of `r corr_ws_sal*100`%, win shares are highly correlated with first year cap percentage. This shouldn't be too groundbreaking: better players get paid more. The player with the highest Win Shares to not get a contract is Miles Bridges in 2022 at 7.2, who we covered earlier. The players with the lowest win shares to get a five-year contract are Bradley Beal & Luguentz Dort in 2022 with 1.4 Win Shares (Beal got a maximum contract at 35% of the salary cap, while Dort received 12.4%).
+
+Finally, let's see how many contracts of each length were given in each offseason.
+
+```{r contracts_by_season, echo=FALSE, fig.align='center',out.width="100%"}
+contract_summary=past_free_agents %>% 
+  group_by(season,contract_yrs) %>% summarize(num_contracts=n()) %>% ungroup() %>% 
+  group_by(season) %>% mutate(tot_contracts=sum(num_contracts),
+                              percent_of_contracts=num_contracts/tot_contracts) %>% 
+  ungroup() 
+contract_per_seas=contract_summary %>%
+  ggplot(aes(x=factor(season),fill=factor(contract_yrs))) +
+  geom_bar(aes(y=percent_of_contracts), 
+           position="dodge",stat="identity") +
+  labs(x="Season",y="Percent of Contracts Given",fill="Contract Years") +
+  scale_fill_brewer(palette="RdYlGn") +
+  scale_y_continuous(labels = scales::percent) +
+  dark_theme_gray()
+ggsave(filename = "Images/Contract Lengths by Offseason.png",plot=contract_per_seas,
+       width=7.5,height=4,units = "in")
+knitr::include_graphics("Images/Contract Lengths by Offseason.png")
+```
+
+It comes as no surprise that as contract length increases, the percent of contracts of that length given out decreases. 2012, 2014, 2017, 2020 & 2021 all follow this descending pattern. There are some outliers:
+
+-   4-year contracts almost doubling 3-year contracts in the reckless spending offseason of 2016 (the year of the cap spike, when the salary cap jumped from \$70 million to \$94 million)
+
+-   2-year contracts outnumbering 1-year contracts in 2013, 2019 and 2022
+
+```{r contracts_by_years_signed, echo=FALSE, fig.align='center',out.width="100%"}
+avg_yr_contract_summary=contract_summary %>% 
+  group_by(contract_yrs) %>% 
+  summarize(avg_percent_of_contracts=mean(percent_of_contracts))
+contracts_by_years_signed=avg_yr_contract_summary %>%
+  ggplot(aes(x=factor(contract_yrs),y=avg_percent_of_contracts,fill=factor(contract_yrs)))+
+  geom_bar(stat="identity", show.legend = FALSE)+
+  labs(x="Contract Years",y="Avg Percent of Contracts Given") +
+  scale_fill_brewer(palette="RdYlGn") +
+  geom_text(aes(label=scales::percent(avg_percent_of_contracts,accuracy=0.01)),
+            position=position_dodge(width=0.9), vjust=-0.25)+
+  scale_y_continuous(labels = scales::percent) +
+  dark_theme_gray()
+ggsave(filename = "Images/Average Contract Lengths.png",plot=contracts_by_years_signed,
+       width=7.5,height=4,units = "in")
+knitr::include_graphics("Images/Average Contract Lengths.png")
+```
+
+Compiling all the seasonal data in the previous graph, we see an average offseason has 50% of free agents not signing a contract. The biggest drop is from 2-year contracts to 3-year contracts.
+
+```{r clean_plots,include=FALSE}
+rm(yrs_vs_sal,ws_vs_sal,contract_per_seas,contracts_by_years_signed,
+   corr_yrs_sal,corr_ws_sal,
+   free_agent_ws,contract_summary,avg_yr_contract_summary)
 ```

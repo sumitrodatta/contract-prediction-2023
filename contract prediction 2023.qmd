@@ -483,6 +483,172 @@ Compiling all the seasonal data in the previous graph, we see an average offseas
 
 ```{r clean_plots,include=FALSE}
 rm(yrs_vs_sal,ws_vs_sal,contract_per_seas,contracts_by_years_signed,
-   corr_yrs_sal,corr_ws_sal,
-   free_agent_ws,contract_summary,avg_yr_contract_summary)
+   corr_ws_sal,free_agent_ws,contract_summary,avg_yr_contract_summary)
+```
+
+## Pre-Processing
+
+### Pre-Processing Stats & Vote Shares
+
+I used regular season stats, although I do understand that some players get paid on the strength of playoff performance. I started off with contract year stats, because there's anecdotal evidence that players exert more effort in their contract year (*cough cough Hassan Whiteside*). All stats except for the advanced stats (OWS, DWS and VORP) were converted to per game. Percentages were left alone.
+
+In addition to using contract year stats and vote shares, I summed the past two years and the contract year.
+
+Why I settled on 3 years:
+
+-   Players do get paid on past performance, so just using contract year stats was out of the question
+-   2 years opens up the possibility of a fluke year
+    -   Kawhi would have his nine game 2018 season bring down his averages significantly from his 2019 season with the Raptors: adding another year somewhat lessens this effect
+-   On the other hand, it's quite unlikely that teams factor in stats from more than 4 years ago, a lot would have changed
+    -   the Celtics didn't pay Blake Griffin to recapture his form of his 2019 All-Star year in Detroit (I would hope)
+-   Another reason I settled on 3 years is that I can keep the same model for restricted free agents
+    -   my thought is that the rookie year is a bonus: great if you did well, but doesn't matter in the grand scheme of things if you did poorly
+    -   rookie extension is more based on how you improved over the course of that initial contract
+    -   For example, if Ja Morant had a worse rookie year but had the same level of play that he has achieved in his second and third year (as well as next year), I highly doubt that Memphis would have offered him a significantly less amount of money due to that substandard rookie year
+
+I performed the same processing on the three-year totals, using the three-year game total as the denominator for converting to per game. I had to calculate the three-year percentages, and also re-engineered the win shares per 48 minutes metric.
+
+I removed categories that were linear combinations of one another. For example, total rebounds can be found by simply adding up offensive and defensive rebounds, and points are just the result of 2\*(number of 2 point field goals made) & 3\*(number of 3 point field goals made). I kept age and experience as predictor variables, but removed position because I felt it would ultimately reflect in the stats themselves.
+
+I divided the three-year versions of games played percentage, games started percentage, All-NBA voting share and All-Defense voting share by 3 to rescale the columns back to a 0-1 range. For example, James Harden received a 100% vote share in 3 consecutive seasons from 2017-2019. Rather than showing all_nba_share_last_3\_yrs as 1+1+1=3 in his 2019 row, dividing by 3 gives us the more easily understood 100% of possible points received in the last 3 years.
+
+The final step was to replace missing values in the shooting percentages with zeroes. These NA's were originally due to lack of attempts.
+
+```{r pre_process}
+stats_and_shares=advanced_and_totals %>% 
+  left_join(.,all_nba_voting_shares) %>% 
+  left_join(.,all_d_vote_shares_since_1991) %>% 
+  replace_na(list(all_nba_share=0,all_defense_share=0))
+three_year_rolling_stats_and_shares=stats_and_shares %>% group_by(player_id) %>% 
+  #three year sum
+  mutate(across(-c(1:9,fg_percent,x3p_percent,
+                   x2p_percent:e_fg_percent,ft_percent),
+                list(three_yrs=~rollapplyr(.,3,sum,partial=TRUE)),
+                .names="{col}_last_3_yrs")) %>%
+  mutate(ws_per_48_last_3_yrs=ws_last_3_yrs/mp_last_3_yrs*48) %>%
+  mutate(fg_percent=ifelse(fga==0,0,fg/fga),
+         x3p_percent=ifelse(x3pa==0,0,x3p/x3pa),
+         x2p_percent=ifelse(x2pa==0,0,x2p/x2pa),
+         e_fg_percent=ifelse(fga==0,0,(fg+0.5*x3p)/fga),
+         ft_percent=ifelse(fta==0,0,ft/fta)) %>%
+  mutate(fg_percent_last_3_yrs=
+           ifelse(fga_last_3_yrs==0,0,fg_last_3_yrs/fga_last_3_yrs),
+         x3p_percent_last_3_yrs=
+           ifelse(x3pa_last_3_yrs==0,0,x3p_last_3_yrs/x3pa_last_3_yrs),
+         x2p_percent_last_3_yrs=
+           ifelse(x2pa_last_3_yrs==0,0,x2p_last_3_yrs/x2pa_last_3_yrs),
+         e_fg_percent_last_3_yrs=
+           ifelse(fga_last_3_yrs==0,0,
+                  (fg_last_3_yrs+0.5*x3p_last_3_yrs)/fga_last_3_yrs),
+         ft_percent_last_3_yrs=
+           ifelse(fta_last_3_yrs==0,0,ft_last_3_yrs/fta_last_3_yrs)) %>%
+  #remove categories that aren't predictive vars or linear combo of others
+  select(-c(lg,pos,birth_year,tm,
+            trb,trb_last_3_yrs,
+            fg,fga,fg_last_3_yrs,fga_last_3_yrs,
+            pts,pts_last_3_yrs)) %>%
+  #convert contract year and last 3 year stats to per game (except games)
+  mutate(across(c(mp,x3p:x3pa,x2p:x2pa,ft:fta,orb:pf),list(per_game=~./g)),
+         .after="gs_percent") %>%
+  select(-c(g,mp,x3p:x3pa,x2p:x2pa,ft:fta,orb:pf,ws)) %>% 
+  mutate(across(mp_last_3_yrs:pf_last_3_yrs,list(per_game=~./g_last_3_yrs)),
+         .after="gs_percent_last_3_yrs") %>%
+  select(-c(g_last_3_yrs,mp_last_3_yrs:pf_last_3_yrs,ws_last_3_yrs)) %>% 
+  ungroup() %>% 
+  #rescale games percentages & vote shares over 3 years back to 0-1
+  mutate(across(c(g_percent_last_3_yrs:gs_percent_last_3_yrs,
+                  all_nba_share_last_3_yrs,
+                  all_defense_share_last_3_yrs),~./3)) %>%
+  replace_na(list(fg_percent=0,x3p_percent=0,x2p_percent=0,
+                  e_fg_percent=0,ft_percent=0))
+```
+
+### Pre-Processing Positions
+
+I took a three-year rolling sum of minutes played for consistency with the previous stats pre-processing, and converted the totals back to percents.
+
+With 3-year positional percentages in hand, it was time to assign the actual positions. Some players play one position almost exclusively, while other players are more flexible and alternate between positions. I set the baseline for a player to be considered at a "pure position" at 75%: if the player played at any position more than 75% of the time, they were deemed to be that position.
+
+All other players were bucketed into combo positions based on the maximum of the following sums of two traditional positions:
+
+-   combo guard (point guard/shooting guard)
+
+-   small wing (shooting guard/small forward)
+
+-   big wing (small forward/power forward)
+
+-   big man (power forward/center)
+
+Some players had multiple combo positions listed due to a small amount of minutes played and two players had no positions listed due to playing less than a full minute, so those players were added manually.
+
+```{r pre_process_positions}
+pbp_last_three_years=pbp_pos_mins %>% group_by(player_id) %>%
+  #rolling 3 year sum of minutes played total & position
+  mutate(across(mp_summed:c_mp_summed,
+                list(three_yrs=~rollapplyr(.,3,sum,partial=TRUE)),
+                .names="{col}_last_3_yrs")) %>% ungroup() %>% 
+  select(-c(mp_summed:c_mp_summed)) %>%
+  #convert totals back to percents
+  mutate(across(pg_mp_summed_last_3_yrs:c_mp_summed_last_3_yrs,
+                ~./mp_summed_last_3_yrs)) %>%
+  rename_with(.fn=~gsub(x = ., pattern = "_mp", replacement = "_percent"),
+              .cols=pg_mp_summed_last_3_yrs:c_mp_summed_last_3_yrs) %>% 
+  select(-mp_summed_last_3_yrs)
+
+#assign pure positions to players with 75% of time at one position
+pure_position=pbp_last_three_years %>% 
+  pivot_longer(.,cols=c(pg_percent_summed_last_3_yrs:c_percent_summed_last_3_yrs),
+               names_to = "pos",values_to = "percent_at_pos") %>% 
+  group_by(seas_id) %>% slice_max(percent_at_pos) %>% ungroup() %>%
+  filter(percent_at_pos>0.75) %>% mutate(pos=word(pos,1,sep="_"))
+
+combo_position=
+  #remove players with pure positions
+  anti_join(pbp_last_three_years,pure_position %>% select(1:4)) %>% 
+  #create buckets of in-between positions
+  mutate(combo_guard=pg_percent_summed_last_3_yrs+sg_percent_summed_last_3_yrs,
+         small_wing=sg_percent_summed_last_3_yrs+sf_percent_summed_last_3_yrs,
+         big_wing=sf_percent_summed_last_3_yrs+pf_percent_summed_last_3_yrs,
+         big_man=pf_percent_summed_last_3_yrs+c_percent_summed_last_3_yrs) %>%
+  select(-c(pg_percent_summed_last_3_yrs:c_percent_summed_last_3_yrs)) %>% 
+  pivot_longer(.,cols=c(combo_guard:big_man),
+               names_to = "pos",values_to = "percent_at_pos") %>% 
+  group_by(seas_id) %>% slice_max(percent_at_pos) %>% ungroup() %>%
+  #4 players had 2 separate combo positions listed
+  filter(!(player=="Terrance Roberson" & season==2001 & pos=="big_wing") &
+           !(player=="Ty Jerome" & season==2020 & pos=="small_wing") &
+           !(player=="Anthony Gill" & season==2021 & pos=="big_man") &
+           !(player=="Chris Duarte" & season==2022 & pos=="combo_guard") &
+           !(player=="Jordan Hall" & season==2023 & pos=="combo_guard"))
+
+all_player_pos=bind_rows(pure_position,combo_position) %>% 
+  #2 players had 0 MP, so they were lost in both combo & pure
+  add_row(seas_id=19914,season=2006,player_id=3589,
+          player="Alex Scales",pos="sg",percent_at_pos=1) %>%
+  add_row(seas_id=22403,season=2010,player_id=3882,
+          player="JamesOn Curry",pos="pg",percent_at_pos=1) %>% 
+  filter(season>2009) %>% select(-c(seas_id,percent_at_pos)) %>%
+  mutate(pos_group=case_when(pos %in% c("pg","sg","combo_guard")~"guard",
+                             pos %in% c("sf","small_wing","big_wing")~"wing",
+                             pos %in% c("pf","c","big_man")~"big"))
+```
+
+### Combining Pre-Processing Dataframes
+
+I joined the positional data and grouped by season and positional group to get the percentage of VORP a player has contributed to their position as a proxy for positional scarcity. While a player may not have had a raw high VORP compared to all offseasons, they could have a significant proportion of their positional group's VORP in that specific offseason and possibly induce a bidding war between teams due to unappetizing other options.
+
+I changed contract years from a numeric column to a factor/category column. This changes its prediction from a regression problem to a classification problem. A 2.5-year contract doesn't make much sense, so it is in our best interest to discretize the years and store them as factors rather than round a regression result.
+
+```{r train_set}
+train_set=inner_join(three_year_rolling_stats_and_shares,past_free_agents) %>% 
+  #multiple free agents with same name in same season
+  filter(!(player=="Tony Mitchell" & seas_id==25056)) %>%
+  filter(!(player=="Chris Johnson" & seas_id==23991)) %>%
+  left_join(.,all_player_pos) %>% group_by(season,pos_group) %>% 
+  mutate(position_vorp=sum(vorp_last_3_yrs)) %>% ungroup() %>%
+  mutate(percent_of_pos_vorp=vorp_last_3_yrs/position_vorp) %>%
+  mutate(contract_yrs=factor(contract_yrs,levels = 0:5)) %>%
+  select(-c(pos,pos_group,position_vorp)) %>%
+  mutate(across(-c(seas_id:experience,type:contract_yrs),~round(.,digits=4)))
+write_csv(train_set,"Data/Train Set.csv")
 ```

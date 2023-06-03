@@ -62,7 +62,9 @@ cols_for_stats=cols(
 )
 
 advanced<-read_csv("Data/Advanced.csv",col_types = cols_for_stats) %>%
-  select(seas_id:mp,ows:ws,vorp) %>% mutate(ws_per_48=ws/mp*48,.before="vorp")
+  select(seas_id:mp,ows:ws,vorp) %>% 
+  #players with 0 mp (rounded down) would have div by zero error
+  mutate(ws_per_48=if_else(mp==0,0,ws/mp*48),.before="vorp")
 totals<-read_csv("Data/Player Totals.csv",col_types = cols_for_stats)
 #max games per season for players on multiple teams
 max_games_tots=totals %>% filter(tm=="TOT") %>% group_by(season,lg,tm) %>%
@@ -651,4 +653,38 @@ train_set=inner_join(three_year_rolling_stats_and_shares,past_free_agents) %>%
   select(-c(pos,pos_group,position_vorp)) %>%
   mutate(across(-c(seas_id:experience,type:contract_yrs),~round(.,digits=4)))
 write_csv(train_set,"Data/Train Set.csv")
+```
+
+## Training Models
+
+There is no need for a subset of the training set to be withheld as a test set before running the models on the evaluation set, because there is built-in cross validation. In the first iteration of this project, I utilized leave-one-out cross validation since the dataset is relatively small (\<1000 observations). How this works is that the model is run excluding one observation. Then, the model attempts to predict the result of that excluded observation. This is repeated for every observation. However, on subsequent runs as the dataset has grown, I've decided to use k-fold cross validation. I've achieved even better results while cutting down significantly on training time.
+
+As we saw in data visualization, the two target variables (contract years and first year salary as a percentage of the salary cap) are fairly well correlated, as they have a Pearson correlation coefficient of `r corr_yrs_sal`. The way I chose to handle this is:
+
+-   predict one target first without the other as a predictor
+
+-   choose the best model (be that a single model or an ensemble of multiple models)
+
+-   use the first target's predictions as an input to predict the second target
+
+One potential problem is compounding errors. If there's an incorrect year prediction, it might lead to an incorrect salary prediction. Initially, to alleviate this problem, I thought it would be sufficient to utilize tidymodels' ability to run multivariate models with more than one outcome. However, I realized that tuning wasn't yet implemented with multi-output regression, and I'm uneasy about choosing arbitrary parameters. An additional (minor) drawback is the outcomes must be of the same type, so we would undo the contract years conversion done in the last section.
+
+### The Models
+
+I used a total of six models.
+
+-   linear regression model as a baseline for salary, and multinomial regression as a baseline for years
+    -   the separation is due to the classification/regression split
+-   k-nearest neighbors model: take the distance between the statistics of two players (the absolute value of the difference) and then take the average of the outcome variable of the k nearest neighbours
+    -   the intuition being that similar players get similar contracts
+-   decision tree model (`rpart`): maybe as a player passes certain statistical thresholds, their contract increases
+    -   only using for predicting the contract years; since there are so many different salary percentages, a solitary decision tree would either be useless or far too complicated
+-   random forest model (`ranger`): reduces instability by averaging multiple trees
+    -   costs interpretability as there is no tree diagram that is representative of the decisions made
+-   support vector machine model: attempt to separate classes with a hyperplane
+    -   support vectors are the points closest to the hyperplane, named as such because the hyperplane would change if those points were removed
+    -   I believe this image from Wikipedia succinctly explains an SVM
+
+```{r svm_explain, out.width="50%", fig.align='center', fig.cap="H1 does not separate the classes. H2 does, but only with a small margin. H3 separates them with the maximal margin. By User:ZackWeinberg, based on PNG version by User:Cyc - This file was derived from: Svm separating hyperplanes.png, CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=22877598",echo=FALSE}
+knitr::include_graphics("Images/SVM2.png")
 ```

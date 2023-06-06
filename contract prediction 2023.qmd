@@ -688,3 +688,245 @@ I used a total of six models.
 ```{r svm_explain, out.width="50%", fig.align='center', fig.cap="H1 does not separate the classes. H2 does, but only with a small margin. H3 separates them with the maximal margin. By User:ZackWeinberg, based on PNG version by User:Cyc - This file was derived from: Svm separating hyperplanes.png, CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=22877598",echo=FALSE}
 knitr::include_graphics("Images/SVM2.png")
 ```
+
+### Predicting Years First, then Salary
+
+```{r actual_values,include=FALSE}
+actual_values=train_set %>% 
+  select(seas_id:player,contract_yrs,first_year_percent_of_cap)
+```
+
+```{r model_table_func,include=FALSE}
+get_yrs_metrics<-function(model,model_name,tuning_var,train_df){
+  f_meas=tuning_var %>% show_best(n=1) %>% pull(mean)
+  contract_yr_predict_vec=predict(model,new_data=train_df) %>% pull()
+  retrain_acc=accuracy_vec(truth=actual_values$contract_yrs,
+                           estimate=contract_yr_predict_vec)
+  off_by_more_than_one=sum(abs(as.numeric(as.character(actual_values$contract_yrs))-
+                                 as.numeric(as.character(contract_yr_predict_vec)))>1)/
+    length(contract_yr_predict_vec)
+  num_max_yr_predicts=sum(as.numeric(as.character(contract_yr_predict_vec))==5)
+  return(tibble(Method=model_name,
+                "Correct Predict %"=retrain_acc %>% 
+                  label_percent(accuracy=0.01)(),
+                "Off by >1 Yr"=off_by_more_than_one %>% 
+                  label_percent(accuracy = 0.01)(),
+                "Max Year Predicts"=num_max_yr_predicts,
+                "F1 Score"=f_meas))
+}
+get_sal_metrics<-function(model,model_name,tuning_var,train_df){
+  metrics_df=left_join(tuning_var %>% select_best(metric="rmse"), 
+                       tuning_var %>% collect_metrics)
+  resid_mean_sq_error=metrics_df %>% filter(.metric=="rmse") %>% pull(mean)
+  mean_abs_error=metrics_df %>% filter(.metric=="mae") %>% pull(mean)
+  sal_predict_vec=predict(model,new_data=train_df) %>% pull()
+  prediction_diffs=abs(actual_values$first_year_percent_of_cap-sal_predict_vec)
+  off_by_more_than_five_percent=sum(prediction_diffs>0.05)/length(prediction_diffs)
+  within_two_percent=sum(prediction_diffs<=0.02)/length(prediction_diffs)
+  return (tibble(Method=model_name,
+                 "Off By >5%"=off_by_more_than_five_percent %>% 
+                   label_percent(accuracy=0.01)(),
+                 "Within 2%"=within_two_percent %>% 
+                   label_percent(accuracy=0.01)(),
+                 MAE=mean_abs_error,RMSE=resid_mean_sq_error))
+}
+```
+
+```{r pretty_variable_importance,include=FALSE}
+prettify_vip<-function(model,title){
+  importance_plot = vip(extract_fit_parsnip(model),scale=TRUE,
+                        mapping = aes(fill = Variable)) +
+  dark_theme_gray() + theme(legend.position = "none") + ggtitle(title)
+  ggsave(paste0("Images/Variable Importance Plots/",title,".png"),plot=importance_plot,
+       width=7.5,height=3.75,units = "in")
+  knitr::include_graphics(paste0("Images/Variable Importance Plots/",title,".png"))
+}
+```
+
+We'll start by predicting years first and then salary with years as an input.
+
+With caret, everything could be thrown into the train function: cross-validation, tuning, data, etc. Tidymodels is more explicit in its steps. The standard 10-fold cross validation is how the data is going to be resampled. In addition, we'll stratify selection, so there is sufficient data to predict all contract year lengths. A hypothetical (albeit unlikely) scenario that could occur without stratification is a fold could include all instances of restricted free agents (which are more rare) in the test portion, and none in the train portion. The chosen algorithm would be confused as to how to predict something for which it has no training.
+
+Recipes is tidymodels' pre-processing package. The first step to change the roles of some variables. The season_id, season, player_id & player variables are of no use as predictors, but are useful to identify observations, so they are given the "id" role. Since we are predicting years first, the first_year_percent_of_cap variable will be removed. Finally, we will convert the free agent type column to a numeric column.
+
+```{r y1_steps}
+set.seed(100)
+cv=vfold_cv(train_set,v=10,strata=type,repeats=5)
+y1_recipe=recipe(contract_yrs~.,data=train_set) %>% 
+  update_role(seas_id:player,new_role="id") %>% 
+  step_rm(first_year_percent_of_cap) %>% step_dummy(type)
+```
+
+Initially, accuracy was chosen as the metric to determine the best submodel by cross-validation. However, with the inherent imbalance of the outcome classes, the F1 score is a better metric. As an extreme example, if there were only two classes with a 90:10 split, a classifier could achieve 90% accuracy by simply predicting the more populous class for every case. On the other hand, the F1 score attempts to minimize both false positives & false negatives. However, the default averaging for F1 is macro-averaging, which gives equal weights to all classes and is exactly the problem we were trying to distance ourselves from by not choosing accuracy. We need to change the averaging function to be macro-weighted. In order to include it within yardstick's metric_set, we have to create a new function wrapping the metric, set the options within the wrapper & formalize it as a new metric.
+
+```{r macro_weight_f_meas}
+macro_weight_f1 <- function(data,truth,estimate,beta = 1,
+                            estimator="macro_weighted",na_rm = TRUE,
+                            event_level = yardstick_event_level(),...){
+  f_meas(data=data,
+         truth = !! rlang::enquo(truth),
+         estimate = !! rlang::enquo(estimate),
+         estimator = "macro_weighted",
+         beta=beta,
+         na_rm=na_rm,
+         event_level=event_level,
+         ...
+         )
+}
+macro_weight_f1 <- new_class_metric(macro_weight_f1,"maximize")
+```
+
+First up is the multinomial regression model.
+
+```{r multinom_yrs_indep}
+wf=workflow() %>% add_recipe(y1_recipe) %>% 
+  add_model(multinom_reg(penalty=0) %>% 
+              set_engine("glmnet") %>% 
+              set_mode("classification"))
+tune_multinom=wf %>% tune_grid(resamples=cv,
+                               metrics=metric_set(macro_weight_f1))
+wf=wf %>% finalize_workflow(tune_multinom %>% select_best())
+fit_y1_multinom=fit(wf,train_set)
+```
+
+Let's get the most important variables of the multinomial model.
+
+```{r multinom_top_vars,echo=FALSE, fig.align='center',out.width="100%"}
+prettify_vip(fit_y1_multinom,"Multinomial Y1 Model Variable Importance")
+```
+
+The contract-year all-defense share dominates the variable importance, with the next best variable being less than 3% as important.
+
+Next up is the k-nearest neighbors model.
+
+```{r knn_yrs_indep}
+wf=workflow() %>% add_recipe(y1_recipe) %>% 
+  add_model(nearest_neighbor(neighbors = tune()) %>% 
+  set_engine("kknn") %>% set_mode("classification"))
+tune_knn=wf %>% tune_grid(resamples=cv,
+                        grid=expand.grid(neighbors=5:50),
+                        metrics=metric_set(macro_weight_f1))
+wf=wf %>% finalize_workflow(tune_knn %>% select_best())
+fit_y1_knn=fit(wf,train_set)
+tune_knn %>% select_best() %>% knitr::kable()
+```
+
+The best knn model is near the upper limit of the tuning grid, taking into account 45 of the closest comparable players.
+
+The next model is the decision tree model. We can tune the cost complexity parameter (cp) in this model. CP is the minimum for how much the residual sum of squares must improve for another partition to be added. A CP that is too high will have too few branches, while a CP that is too low will be difficult to follow since there are many branches. We lean towards the lower end of the spectrum. We will also change the min_n, which is the minimum number of data points in a node that are required for the node to be split further. The default is 20, but the 5-year portion of the dataset is small, so we will decrease min_n to 1. Since there exists an element of randomness in choosing samples to model a decision tree, we need to set a seed to keep the work reproducible.
+
+```{r decision_tree_yrs_indep}
+set.seed(100,sample.kind = "Rounding")
+wf=workflow() %>% add_recipe(y1_recipe) %>% 
+  add_model(decision_tree(cost_complexity = tune(),min_n=tune()) %>% 
+  set_engine("rpart") %>% set_mode("classification"))
+tune_tree=wf %>% tune_grid(resamples=cv,
+                        grid=expand.grid(cost_complexity=0.1^seq(2,5),
+                                         min_n=seq(1:10)),
+                        metrics=metric_set(macro_weight_f1))
+wf=wf %>% finalize_workflow(tune_tree %>% select_best())
+fit_y1_tree=fit(wf,train_set)
+tune_tree %>% select_best() %>% knitr::kable()
+```
+
+Let's get the most important variables of the decision_tree model.
+
+```{r decision_tree_top_vars,echo=FALSE, fig.align='center',out.width="100%"}
+prettify_vip(fit_y1_tree,"Decision Tree Y1 Model Variable Importance")
+```
+
+The individual contract-year components of the holistic advanced stat of win shares rank within the top-4 most important variables. Durability and availabilty are also highly desirable characteristics, as evidenced by the high values of contract-year minutes per game, contract-year games played percentage and last-3-years games played percentage.
+
+```{r decision_tree, echo=FALSE, fig.align='center',out.width="100%"}
+rpart.plot::rpart.plot(pull_workflow_fit(fit_y1_tree)$fit,
+                  roundint = FALSE,legend.x=NA,extra=0)
+```
+
+The decision tree does not predict any 5-year contracts. The decision tree maximizes its prediction at 4 contract years when a player does all of the following:
+
+-   has defensive win shares above 0.55 in the contract year
+-   plays more than 27 minutes per game in the contract year
+-   has a value over replacement player above 0.75
+
+The next model is a random forest. Since `ranger` is a *random* forest algorithm, we need to set a seed to keep the work reproducible.
+
+Random forest algorithms require an explicit call for variable importance, so we'll ask for permutation importance. A simplified explanation for permutation importance is shuffling a predictor's values and seeing how much the error increases. As a predictor's importance increases, it is difficult for the rest of the model to compute accurate predictions without it. There are 3 tuning parameters:
+
+-   trees is the number of decision trees to create
+    -   the default is 500, which we'll keep
+-   mtry is the number of variables to split at each decision node
+    -   the default is the rounded square root of the number of variables, which in this case would be `round(sqrt(55))`
+    -   we will try all integers between 5 & 10
+-   min_n is the same as the decision tree
+    -   the default is 1 for a classification problem like this, which we'll keep
+
+```{r rand_forest_yrs_indep}
+set.seed(100,sample.kind = "Rounding")
+wf=workflow() %>% add_recipe(y1_recipe) %>% 
+  add_model(rand_forest(mtry = tune()) %>% 
+  set_engine("ranger",importance="permutation") %>% set_mode("classification"))
+tune_forest=wf %>% tune_grid(resamples=cv,
+                        grid=expand.grid(mtry=5:10),
+                        metrics=metric_set(macro_weight_f1))
+wf=wf %>% finalize_workflow(tune_forest %>% select_best())
+fit_y1_forest=fit(wf,train_set)
+tune_forest %>% select_best() %>% knitr::kable()
+```
+
+```{r rand_forest_top_vars,echo=FALSE, fig.align='center',out.width="100%"}
+prettify_vip(fit_y1_forest,"Random Forest Y1 Model Variable Importance")
+```
+
+Random forest variable importance has a more gradual decline than either decision tree or multinomial. The contract year versions of the holistic advanced stats are in the top 5 most important variables in the random forest model, with the other 2 spots taken by both versions of the games played percentage.
+
+Finally, we train the support vector machine on the model. There are two tuning parameters:
+
+-   rbf_sigma: determines how well to fit the training data (higher=fit closer to training)
+    -   with a high sigma, every workaday big with middling stats might be predicted to get close to 2016 Mozgov money
+-   cost: tradeoff between smoothness of boundaries and correct classification
+    -   with a high cost, leads to too wiggly of a boundary, and might not generalize to test sets
+    -   tests using C=0.25, C=0.5 and C=1
+
+```{r svm_yrs_indep}
+set.seed(100,sample.kind = "Rounding")
+wf=workflow() %>% add_recipe(y1_recipe) %>% 
+  add_model(svm_rbf(rbf_sigma=tune(),cost=tune()) %>% 
+  set_engine("kernlab") %>% set_mode("classification"))
+tune_svm=wf %>% tune_grid(resamples=cv,
+                        grid=expand.grid(rbf_sigma=0.1^seq(2:5),
+                                         cost=c(0.25,0.5,1)),
+                        metrics=metric_set(macro_weight_f1))
+wf=wf %>% finalize_workflow(tune_svm %>% select_best())
+fit_y1_svm=fit(wf,train_set)
+tune_svm %>% select_best() %>% knitr::kable()
+```
+
+Unfortunately, there is no concept of variable importance for an SVM model.
+
+Let's look at some performance metrics, and see which models we want to take along as inputs for predicting salary.
+
+```{r y1_metrics,echo=FALSE}
+models<-get_yrs_metrics(fit_y1_multinom,"Multinomial",tune_multinom,train_set)
+models<-bind_rows(models,
+                  get_yrs_metrics(fit_y1_knn,"KNN",tune_knn,train_set),
+                  get_yrs_metrics(fit_y1_tree,"Decision Tree",tune_tree,train_set),
+                  get_yrs_metrics(fit_y1_forest,"Random Forest",tune_forest,train_set),
+                  get_yrs_metrics(fit_y1_svm,"SVM",tune_svm,train_set))
+gt(models)
+```
+
+The SVM has the highest F1 score, but the lowest accuracy. The random forest stands far above the rest with \~97% accuracy! In 2020's project, the random forests had the best performance as well, but had difficulty distinguishing 5-year contracts. Shifting to a classification problem has solved that. The multinomial model had significantly more max-year predictions than KNN as well as the highest F1-score barring the SVM, whereas KNN had \~4% better accuracy. While anticlimactic, I think the best course of action is to simply use the random forest model to make contract-year predictions. We'll convert the prediction column to use it as a numeric predictor.
+
+```{r y1_predict_for_s2}
+train_set_after_y1=train_set %>% select(-contract_yrs) %>% 
+  bind_cols(contract_yrs=
+              as.numeric(
+                as.character(
+                  predict(fit_y1_forest,new_data=train_set) %>% pull()
+                  )
+                )
+            )
+cv=vfold_cv(train_set_after_y1,v=10,strata=type,repeats=5)
+s2_recipe=recipe(first_year_percent_of_cap~.,data=train_set_after_y1) %>% 
+  update_role(seas_id:player,new_role="id") %>% step_dummy(type)
+```

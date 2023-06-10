@@ -205,6 +205,7 @@ The next file I used was salary cap history, scraped from RealGM. To somewhat no
 ```{r load_cap_hist}
 #subtract one from year to match up with offseason in which contract was signed
 salary_cap_hist<-read_csv("Data/Salary Cap History.csv") %>% mutate(season=season-1)
+current_salary_cap=salary_cap_hist %>% filter(season==2023) %>% pull()
 #create variable of first year salary as percentage of cap
 #easier to compare across years
 past_free_agents<-past_free_agents %>% select(-c(terms,Source)) %>% 
@@ -514,7 +515,7 @@ I performed the same processing on the three-year totals, using the three-year g
 
 I removed categories that were linear combinations of one another. For example, total rebounds can be found by simply adding up offensive and defensive rebounds, and points are just the result of 2\*(number of 2 point field goals made) & 3\*(number of 3 point field goals made). I kept age and experience as predictor variables, but removed position because I felt it would ultimately reflect in the stats themselves.
 
-I divided the three-year versions of games played percentage, games started percentage, All-NBA voting share and All-Defense voting share by 3 to rescale the columns back to a 0-1 range. For example, James Harden received a 100% vote share in 3 consecutive seasons from 2017-2019. Rather than showing all_nba_share_last_3\_yrs as 1+1+1=3 in his 2019 row, dividing by 3 gives us the more easily understood 100% of possible points received in the last 3 years.
+I divided the three-year versions of games played percentage, games started percentage, All-NBA voting share and All-Defense voting share by 3 to rescale the columns back to a 0-1 range. For example, James Harden received a 100% vote share in 3 consecutive seasons from 2017-2019. Rather than showing all_nba_share_last_3_yrs as 1+1+1=3 in his 2019 row, dividing by 3 gives us the more easily understood 100% of possible points received in the last 3 years.
 
 The final step was to replace missing values in the shooting percentages with zeroes. These NA's were originally due to lack of attempts.
 
@@ -1126,7 +1127,7 @@ fit_y2_multinom=fit(wf,train_set_after_s1)
 prettify_vip(fit_y2_multinom,"Multinomial Y2 Model Variable Importance")
 ```
 
-The multinomial years-second model essentially discards all other variables in favor of the predicted first-year-percent-of-cap variable. The two variables that are not less than 1% variable importance are all_nba_share_last_3\_yrs (added this year) and percent_of_pos_vorp (added last year).
+The multinomial years-second model essentially discards all other variables in favor of the predicted first-year-percent-of-cap variable. The two variables that are not less than 1% variable importance are all_nba_share_last_3_yrs (added this year) and percent_of_pos_vorp (added last year).
 
 ```{r knn_yrs_dep}
 wf=workflow() %>% add_recipe(y2_recipe) %>% 
@@ -1215,14 +1216,114 @@ models<-bind_rows(models,
 models %>% gt()
 ```
 
-The random forest is third in F1 score, but also has less than one percent of predictions that are off by more than one year. The multinomial model has the highest F1 score, and the second-best performer in all other metrics after the random forest. We will take the mean of the multinomial model & the random forest models to generate Y2 predictions.
+The random forest is third in F1 score, but also has less than one percent of predictions that are off by more than one year. The multinomial model has the highest F1 score, and the second-best performer (yet still distant) in all other metrics after the random forest. We will use the random forest as the sole model to generate Y2 predictions.
 
 ```{r remove_unused_future_vars,include=FALSE}
 rm(fit_s1_knn,fit_s1_lin,fit_s1_svm,
    fit_y1_multinom,fit_y1_knn,fit_y1_tree,fit_y1_svm,
    fit_s2_knn,fit_s2_lin,
-   fit_y2_knn,fit_y2_tree,fit_y2_svm,
+   fit_y2_multinom,fit_y2_knn,fit_y2_tree,fit_y2_svm,
    tune_lin,tune_multinom,tune_knn,tune_tree,tune_forest,tune_svm,
    train_set_after_s1,train_set_after_y1,
    y1_recipe,y2_recipe,s1_recipe,s2_recipe,wf,cv,models)
+```
+
+## Results
+
+Now it's time to run the models on the 2023 data.
+
+Since the models depend on contract year stats, these players were removed from the evaluation set:
+
+```{r removed, echo=FALSE}
+anti_join(current_fa,three_year_rolling_stats_and_shares) %>% 
+  select(player,type) %>% gt()
+```
+
+### Years First, Salary Second
+
+As a reminder, we're using a random forest as our years prediction, and using the mean of a random forest and SVM to predict salary.
+
+```{r eval_set}
+eval_set=inner_join(three_year_rolling_stats_and_shares,current_fa) %>% 
+  left_join(.,all_player_pos) %>% group_by(season,pos_group) %>% 
+  mutate(position_vorp=sum(vorp_last_3_yrs)) %>% ungroup() %>%
+  mutate(percent_of_pos_vorp=vorp_last_3_yrs/position_vorp) %>%
+  mutate(contract_yrs=factor(contract_yrs,levels = 0:5)) %>%
+  select(-c(pos,pos_group,position_vorp)) %>%
+  mutate(across(-c(seas_id:experience,type:contract_yrs),~round(.,digits=4)))
+write_csv(eval_set,"Data/Eval Set.csv")
+```
+
+```{r y1s2_predictions}
+eval_y1_predict=as.numeric(as.character(
+  predict(fit_y1_forest,new_data=eval_set) %>% pull()))
+eval_s2_predict_forest=predict(fit_s2_forest,
+                               new_data=eval_set %>% select(-contract_yrs) %>%
+                                 bind_cols(contract_yrs=eval_y1_predict))
+eval_s2_predict_svm=predict(fit_s2_svm,
+                               new_data=eval_set %>% select(-contract_yrs) %>%
+                                 bind_cols(contract_yrs=eval_y1_predict))
+eval_s2_predict=tibble(forest=eval_s2_predict_forest %>% pull(),
+                       svm=eval_s2_predict_svm %>% pull()) %>%
+  mutate(m=(forest+svm)/2) %>% pull(m)
+```
+
+### Salary First, Years Second
+
+For the S1Y2 model, we are using random forests as our salary prediction, and using the mean of a random forest and multinomial to predict years. One problem could happen in differing predictions between the two: a half-year average prediction (if one model predicts 3 years and another predicts 4 years, the average is 3.5 years, which does not make sense). We will tend to the optimistic side of prediction by rounding up any half-year predictions. Additionally, due to the rarity of 5-year contract predictions, if either model predicts a 5-year contract for a player, that will be the final prediction regardless of the other model's value.
+
+```{r s1y2_predictions}
+eval_s1_predict=predict(fit_s1_forest,new_data=eval_set) %>% pull()
+eval_y2_predict=as.numeric(as.character(
+  predict(fit_y2_forest,new_data=eval_set %>% select(-first_year_percent_of_cap) %>%
+            bind_cols(first_year_percent_of_cap=eval_s1_predict)) %>% 
+  pull()))
+```
+
+### Player Option Decisions and Selected Free Agents
+
+Before I look at which players might be accepting or declining their option and then some selected high-profile free agents, let's look at the distribution of contract years.
+
+```{r both_model_results,include=FALSE}
+final_results<-eval_set %>% 
+  select(-c(contract_yrs,first_year_percent_of_cap)) %>%
+  add_column(yrs_Y1S2=eval_y1_predict,
+             yr1_cap_percent_Y1S2=eval_s2_predict,
+             yrs_S1Y2=eval_y2_predict,
+             yr1_cap_percent_S1Y2=eval_s1_predict)
+```
+
+```{r yrs_dist,echo=FALSE,results='asis'}
+final_results %>% group_by(yrs_Y1S2) %>% tally() %>% gt()
+final_results %>% group_by(yrs_S1Y2) %>% tally() %>% gt()
+```
+
+On the first iteration of this project, both the Y1S2 & the S1Y2 had only 4-5 players being out of the league. This didn't make sense, as the annual rookie draft brings in at least 30 new players. The problem was that there were players who were predicted to receive contracts but receiving salaries that were less than the minimum. My solution is to convert any salary predictions less than the minimum to zero, and any years predictions to zero where the salary prediction is zero.
+
+For the 2023-24 season, the salary cap is `r scales::dollar(current_salary_cap)`. The minimum contract from [RealGM](https://basketball.realgm.com/nba/info/salary_cap) is \$1,774,999. Therefore the minimum first year percent of cap in 2023-2024 is `r scales::percent(1774999/current_salary_cap,accuracy=0.01)` .
+
+```{r convert_less_than_mins}
+first_yr_min=1774999/current_salary_cap
+final_results=final_results %>% 
+  mutate(yrs_Y1S2=ifelse(yr1_cap_percent_Y1S2<=first_yr_min,0,yrs_Y1S2)) %>%
+  mutate(yr1_cap_percent_Y1S2=ifelse(yrs_Y1S2==0,0,yr1_cap_percent_Y1S2)) %>%
+  mutate(yrs_S1Y2=ifelse(yr1_cap_percent_S1Y2<=first_yr_min,0,yrs_S1Y2)) %>%
+  mutate(yr1_cap_percent_S1Y2=ifelse(yrs_S1Y2==0,0,yr1_cap_percent_S1Y2))
+```
+
+```{r yrs_dist_corrected,echo=FALSE, results='asis'}
+final_results %>% group_by(yrs_Y1S2) %>% tally() %>% gt()
+final_results %>% group_by(yrs_S1Y2) %>% tally() %>% gt()
+```
+
+The Y1S2 predictions remain unchanged, while some 1-year and a fair amount of 2-year contracts in the S1Y2 predictions get converted to 0-year due to the salary being below the minimum threshold.
+
+Another task is to make the information more digestible. Contracts are usually reported in terms of total value, and players usually get five percent raises per year, so I'll add a column for each method for total contract value assuming the projected cap value of `r scales::dollar(current_salary_cap)`.
+
+```{r total_val_add}
+final_results=final_results %>% 
+  mutate(total_Y1S2=
+           round(yr1_cap_percent_Y1S2*current_salary_cap*((1.05)^(yrs_Y1S2)-1)/0.05,digits=-4),
+         total_S1Y2=
+             round(yr1_cap_percent_S1Y2*current_salary_cap*((1.05)^(yrs_S1Y2)-1)/0.05,digits=-4))
 ```

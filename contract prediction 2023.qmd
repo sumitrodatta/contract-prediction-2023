@@ -5,7 +5,7 @@ format: pdf
 editor: visual
 date: "`r Sys.Date()`"
 execute:
-  #cache: true
+  cache: true
   echo: true
   warning: false
   message: false
@@ -1285,7 +1285,7 @@ eval_y2_predict=as.numeric(as.character(
 Before I look at which players might be accepting or declining their option and then some selected high-profile free agents, let's look at the distribution of contract years.
 
 ```{r both_model_results,include=FALSE}
-final_results<-eval_set %>% 
+results<-eval_set %>% 
   select(-c(contract_yrs,first_year_percent_of_cap)) %>%
   add_column(yrs_Y1S2=eval_y1_predict,
              yr1_cap_percent_Y1S2=eval_s2_predict,
@@ -1294,8 +1294,8 @@ final_results<-eval_set %>%
 ```
 
 ```{r yrs_dist,echo=FALSE,results='asis'}
-final_results %>% group_by(yrs_Y1S2) %>% tally() %>% gt()
-final_results %>% group_by(yrs_S1Y2) %>% tally() %>% gt()
+results %>% group_by(yrs_Y1S2) %>% tally() %>% gt()
+results %>% group_by(yrs_S1Y2) %>% tally() %>% gt()
 ```
 
 On the first iteration of this project, both the Y1S2 & the S1Y2 had only 4-5 players being out of the league. This didn't make sense, as the annual rookie draft brings in at least 30 new players. The problem was that there were players who were predicted to receive contracts but receiving salaries that were less than the minimum. My solution is to convert any salary predictions less than the minimum to zero, and any years predictions to zero where the salary prediction is zero.
@@ -1304,7 +1304,7 @@ For the 2023-24 season, the salary cap is `r scales::dollar(current_salary_cap)`
 
 ```{r convert_less_than_mins}
 first_yr_min=1774999/current_salary_cap
-final_results=final_results %>% 
+results_mins_conversion=results %>% 
   mutate(yrs_Y1S2=ifelse(yr1_cap_percent_Y1S2<=first_yr_min,0,yrs_Y1S2)) %>%
   mutate(yr1_cap_percent_Y1S2=ifelse(yrs_Y1S2==0,0,yr1_cap_percent_Y1S2)) %>%
   mutate(yrs_S1Y2=ifelse(yr1_cap_percent_S1Y2<=first_yr_min,0,yrs_S1Y2)) %>%
@@ -1312,18 +1312,132 @@ final_results=final_results %>%
 ```
 
 ```{r yrs_dist_corrected,echo=FALSE, results='asis'}
-final_results %>% group_by(yrs_Y1S2) %>% tally() %>% gt()
-final_results %>% group_by(yrs_S1Y2) %>% tally() %>% gt()
+results_mins_conversion %>% group_by(yrs_Y1S2) %>% tally() %>% gt()
+results_mins_conversion %>% group_by(yrs_S1Y2) %>% tally() %>% gt()
 ```
 
 The Y1S2 predictions remain unchanged, while some 1-year and a fair amount of 2-year contracts in the S1Y2 predictions get converted to 0-year due to the salary being below the minimum threshold.
 
-Another task is to make the information more digestible. Contracts are usually reported in terms of total value, and players usually get five percent raises per year, so I'll add a column for each method for total contract value assuming the projected cap value of `r scales::dollar(current_salary_cap)`.
+Another task is to make the information more digestible. Contracts are usually reported in terms of total value, and players usually get five percent raises per year (not compounded, but rather a percent of the first year salary). I'll add a column for each method for total contract value assuming the projected cap value of `r scales::dollar(current_salary_cap)`.
 
 ```{r total_val_add}
-final_results=final_results %>% 
+calculate_total_value<-function(cap_percent,years){
+  #first year salary is base for all years
+  salary_base=cap_percent*current_salary_cap*years
+  #amount over base in raises
+  amount_in_raises=(0.5*years^2-0.5*years)*0.05*cap_percent*current_salary_cap
+  return(salary_base+amount_in_raises)
+}
+
+final_results=results_mins_conversion %>% 
   mutate(total_Y1S2=
-           round(yr1_cap_percent_Y1S2*current_salary_cap*((1.05)^(yrs_Y1S2)-1)/0.05,digits=-4),
+           round(calculate_total_value(yr1_cap_percent_Y1S2,yrs_Y1S2),digits=-4),
          total_S1Y2=
-             round(yr1_cap_percent_S1Y2*current_salary_cap*((1.05)^(yrs_S1Y2)-1)/0.05,digits=-4))
+             round(
+           round(calculate_total_value(yr1_cap_percent_S1Y2,yrs_S1Y2),digits=-4),
+               digits=-4))
+```
+
+#### Player Option Decisions
+
+```{r gt_format_for_pdf,include=FALSE}
+fa_table_format<-function(df,options=TRUE){
+  formatted=df %>% select(-player_id) %>% gt() %>%
+  fmt_percent(columns=c(yr1_cap_percent_Y1S2,yr1_cap_percent_S1Y2)) %>%
+  fmt_currency(columns=c(total_Y1S2,total_S1Y2),suffixing=TRUE) %>%
+  tab_spanner(label="Y1S2",columns=c(yr1_cap_percent_Y1S2,yrs_Y1S2,total_Y1S2)) %>%
+  tab_spanner(label="S1Y2",columns=c(yr1_cap_percent_S1Y2,yrs_S1Y2,total_S1Y2)) %>%
+  cols_label(yr1_cap_percent_Y1S2="Cap %",yr1_cap_percent_S1Y2="Cap %",
+             yrs_Y1S2="Yrs",yrs_S1Y2="Yrs",
+             total_Y1S2="Total",total_S1Y2="Total")
+  if (options){
+    formatted=formatted %>% fmt_currency(columns=option_amt,suffixing=TRUE)
+  }
+  return(formatted)
+}
+```
+
+```{r join_options,echo=FALSE}
+options_decisions=inner_join(final_results,current_fa_options) %>%
+  arrange(desc(option_amt)) %>%
+  select(player_id,player,
+         yr1_cap_percent_Y1S2,yrs_Y1S2,total_Y1S2,
+         yr1_cap_percent_S1Y2,yrs_S1Y2,total_S1Y2,
+         option_type,option_amt)
+```
+
+```{r player_options,echo=FALSE}
+fa_table_format(options_decisions %>% 
+                  filter(option_type=="Player") %>% select(-option_type))
+```
+
+Khris Middleton is a massive outlier, even more so than Bradley Beal last year. A player of his caliber will surely receive a contract offer for longer than one year. Middleton only played 33 games in his contract year after having offseason wrist surgery and dealing with right knee soreness. In his prior two seasons, Middleton averaged 20 points on 46% from the field and 39% from three-point range, but those numbers dipped to 15 points, 43% from the field and 31% from three-point range in the contract year. Kristaps Porzingis is the only five year prediction in the entire dataset. His previous five-year contract isn't even in the training set due to Porzingis missing the entire 2019 season recovering from a torn ACL. Fred VanVleet, Draymond Green & Josh Hart have already declined their player options. Bruce Brown is in line for a massive pay bump after signing a 1+1 last year with the Nuggets and becoming a key part of their championship team.
+
+```{r team_options,echo=FALSE}
+fa_table_format(options_decisions %>% 
+                  filter(option_type=="Club") %>% select(-option_type))
+```
+
+Kenyon Martin Jr and Xavier Tillman Sr are in the same boat, as 2020 second round picks who signed 3-year deals (coincidentally, both were picked by the Sacramento Kings and traded to the Rockets & Grizzlies respectively). Their teams could pick up the option, but would make the players unrestricted free agents in 2024. The Rockets are intimately familiar with the process, as they declined Jae'Sean Tate's option last year to re-sign him to a [3-year, \$22.1M contract](https://rocketswire.usatoday.com/2022/06/30/rockets-re-sign-jaesean-tate-for-three-years-22-1-million/) (I had him pegged for a 2-year, \$16.7M contract). The Pelicans have a somewhat easier decision with Herb Jones, as he'd still be a restricted free agent in 2024 if the team picks up his option.
+
+#### Selected Free Agents
+
+```{r non_option_contracts,echo=FALSE}
+non_options=anti_join(final_results,current_fa_options %>% select(player)) %>%
+  arrange(desc((yr1_cap_percent_Y1S2+yr1_cap_percent_S1Y2)/2)) %>%
+  select(player_id,player,type,
+         yr1_cap_percent_Y1S2,yrs_Y1S2,total_Y1S2,
+         yr1_cap_percent_S1Y2,yrs_S1Y2,total_S1Y2)
+```
+
+Now let's see what the models have predicted for this year's other notable free agents. I'll present them five at a time and comment on some projections. We'll look at restricted free agents first.
+
+```{r rfas_top_five,echo=FALSE}
+fa_table_format(non_options %>% filter(type=="RFA") %>% select(-type) %>% slice(1:5),
+                options=FALSE)
+```
+
+The RFA class is not as top heavy as last year. Cam Johnson, part of the Nets midseason trade return for Kevin Durant, would rank third last year in average projection behind Miles Bridges & former Suns teammate Deandre Ayton. Picked one pick after Johnson at number 12 in 2020, Washington has toiled away in Charlotte as a solid role player. He's played the second most games for the Hornets since being drafted, and set a career high in points per game last year at 15.7. Reaves is the second fan-favorite white Lakers guard to hit free agency in three seasons, but that's where the comparisons with Alex Caruso end. Caruso is a defensive menace who made his first All-Defensive team this year; Reaves is more gifted on the offensive side of the ball, particularly adept at drawing fouls (he led all NBA guards in free throw attempts per field goal attempt at 0.541).
+
+```{r rfas_five_to_ten,echo=FALSE}
+fa_table_format(non_options %>% filter(type=="RFA") %>% select(-type) %>% slice(6:10),
+                options=FALSE)
+```
+
+The young Chicago Bulls guards (White & Dosunmu) have similar cap percentage projections, with Dosunmu getting more under Y1S2 and White getting more under S1Y2. Thybulle made the All-Defensive Second Team in 2021 & 2022, but his offensive limitations led the Sixers to trade him to the Trail Blazers for a 2029 2nd-round pick. Hachimura's another example of someone who'll get more than projected; at the very least, his qualifying offer is for \$8.5 million. Hachimura performed relatively well next to LeBron James in the bright lights of LA as the Lakers made a run to the Western Conference Finals (reminder that the models do not take into account playoff stats).
+
+On to the unrestricted free agents.
+
+```{r ufas_top_five,echo=FALSE}
+fa_table_format(non_options %>% filter(type=="UFA") %>% select(-type) %>% slice(1:5),
+                options=FALSE)
+```
+
+Kyrie somewhat surprisingly picked up his \$36.5M option last year. He had another eventful year, being suspended in November for [posting a link to an antisemitic film on Twitter & failing to unequivocally say he has no antisemitic beliefs](https://www.nba.com/news/adam-silver-wants-apology-for-reckless-post-kyrie-irving-offers-none), and then traded in February to the Dallas Mavericks. Jerami Grant was acquired by the Trail Blazers last offseason to flank loyal superstar Damian Lillard. Grant was able to merge the efficiency he had from 2018-2020 with the volume scoring he showed as the first option for Detroit in 2021 & 2022. The Blazers ended up tanking after the All-Star break, and jumped up to the number 3 pick. Do the Blazers trade Lillard, let Grant walk and begin a rebuild or do they dangle the number 3 pick for a star that'll hopefully push them over the hump? Brook Lopez actually cannot get his projected contract years due to the Over-38 CBA rule. Due to Lopez turning 38 in 2026, the [complications of adding a fourth year to any contract offer](https://www.spotrac.com/news/next-contract-series-brook-lopez-1823/) aren't worth it.
+
+```{r ufas_mid_five,echo=FALSE}
+fa_table_format(non_options %>% filter(type=="UFA") %>% select(-type) %>% slice(6:10),
+                options=FALSE)
+```
+
+I feel very confident in saying that Mason Plumlee will not getting his projected contract. Poeltl follows the same archetype as a non-shooting, paint-bound center with some playmaking chops, with the added bonus that he is six years younger than Plumlee. The ever-polarizing Russell Westbrook has the highest salary projection for players only projected for 1 contract year.
+
+```{r ufas_last_five,echo=FALSE}
+fa_table_format(non_options %>% filter(type=="UFA") %>% select(-type) %>% slice(11:15),
+                options=FALSE)
+```
+
+Strus & Gabe Vincent (average projection of 2 years and \$10.6M) were integral parts of the supporting cast flanking Jimmy Butler & Bam Adebayo during Miami's surprising run as an eight seed to the NBA Finals. They'll get more than projections after performing under the brightest of lights. While Brooks might take too many shots for someone as efficient as he is and talked his way out of Memphis (seriously, [he will not be brought back under any circumstances](https://twitter.com/ShamsCharania/status/1653430519315714049)), he is a ferocious and versatile defender. He made second-team All-Defense this year with a key part of that candidacy being that ["he has matched up against All-Stars more than any other NBA player, and he has defended them better than anybody else."](https://twitter.com/SpacesGrizzlies/status/1637440197943083010/)
+
+```{r save_as_csvs,include=FALSE}
+write_csv(options_decisions,"Output Data/Options.csv")
+write_csv(non_options,"Output Data/Non-Option Contracts.csv")
+```
+
+```{r save_models,include=FALSE}
+saveRDS(fit_y1_forest,"Output Data/Y1 Forest.rds")
+saveRDS(fit_s2_forest,"Output Data/S2 Forest.rds")
+saveRDS(fit_s2_svm,"Output Data/S2 SVM.rds")
+saveRDS(fit_s1_forest,"Output Data/S1 Forest.rds")
+saveRDS(fit_y2_forest,"Output Data/Y2 Forest.rds")
 ```

@@ -13,6 +13,20 @@ execute:
 
 # Introduction
 
+This is going to be my fourth year attempting to predict free agent contracts. What happened last year?
+
+-   **James Harden & Bradley Beal** both opted out of their player options & re-signed with their teams. Harden signed a [2-year, \$68.6M](https://www.nba.com/news/harden-agrees-to-2-year-68-6m-deal-with-76ers) contract including a player option with the Sixers. Beal signed a [five-year, \$251M](https://twitter.com/wojespn/status/1542629367779565569) maximum contract (including a no-trade clause) to stay with the Wizards.
+
+-   Restricted free agents **Deandre Ayton & Anfernee Simons** cashed in, signing long-term deals with their current teams. Ayton signed a [4-year, \$133M](https://twitter.com/ShamsCharania/status/1547737051751059457) offer sheet with the Pacers that was subsequently matched by the Suns. Simons agreed to a [4-year, \$100M](https://www.nba.com/news/anfernee-simons-2022-nba-free-agency) contract with the Blazers.
+
+-   Unrestricted free agents **Zach LaVine & Jalen Brunson** were the only other players to secure deals totalling more than \$100M. LaVine extended his tenure with the Bulls by agreeing to a [5-year, \$215M](https://www.nba.com/news/zach-lavine-2022-nba-free-agency) maximum contract. Jalen Brunson was the only player in the top 6 and one of 2 in the top 13 to switch teams, moving from Dallas to New York on a [4-year, \$104M](https://www.nba.com/news/jalen-brunson-2022-nba-free-agency) contract.
+
+Top players holding player options include **Khris Middleton, James Harden & Kristaps Porzingis.** Middleton was a key part of the Bucks championship in 2021, but struggled with health this year. He had offseason wrist surgery causing him to miss the first 20 games of the season and he encountered some knee soreness that cost him eighteen games in December & January. Harden signed a short-term contract at less than his maximum amount to give the Sixers some cap flexibility; this allowed the team to sign Harden's former teammate PJ Tucker. Harden was the sidekick to eventual MVP Joel Embiid, but the Sixers bowed out in the second round of the playoffs to their hated rivals in the Boston Celtics. Porzingis had his first full season in Washington after being traded there in 2022 from the Mavericks, where the Luka-Zinger pairing had seemingly run its course. Porzingis had his healthiest season in five years (since his All-Star year in 2018), setting career highs in points per game and shooting efficiency.
+
+In terms of restricted free agents, the top players are **Cameron Johnson, PJ Washington & Austin Reaves**. In his sophomore year, Johnson was the Suns sixth man on their run to the Finals in 2021. He has improved his efficiency as his field goal attempts have increased. Johnson was part of the trade bringing Kevin Durant to the desert, landing in Brooklyn with Mikal Bridges. Washington has spent the first four years of his NBA career in Charlotte as a steady big in a team usually dominated by its guards (Terry Rozier has been on the team for the same time as Washington, Devonte' Graham led the team in scoring in Washington's first year, and LaMelo Ball was drafted at number 3 in 2021). Reaves went undrafted in 2021 and signed a two-way deal with the Lakers. He was converted to a regular deal a month before the season started, and showed some promise in a season in which the Lakers missed the playoffs due to stars LeBron James & Anthony Davis missing large chunks of the season. Reaves leveled up in 2023, averaging the fifth-most minutes per game & points per game on the team.
+
+On the unrestricted free agent side, we've got **Kyrie Irving, Nikola Vucevic & Fred VanVleet** topping the lists. Kyrie had a \$36.5M option last year that he picked up, [surprising even his own team](https://nba.nbcsports.com/2022/06/28/report-nets-learned-of-kyrie-irving-opting-in-with-his-public-statement/). He was named an All-Star for the eighth time in his career, but after talks stalled on an extension, Kyrie [requested a trade](https://www.nba.com/news/kyrie-irving-requests-trade) in early February. His wish was granted two days later when he was sent to the Dallas Mavericks. Vucevic was acquired at the 2021 trade deadline by the Bulls in a trade with the Magic to give Zach LaVine the best big man he had played with. After signing Lonzo Ball and DeMar DeRozan in the 2021 offseason, the Bulls looked to make some noise. Unfortunately, the 2022 Bulls were the 6th-seed and lost in the first round to the eventual champion Bucks, while the 2023 Bulls lost in the play-in. With Ball having a seemingly career-ending injury, perhaps the Bulls let Vucevic walk rather than locking themselves into a lower-end playoff team at best? VanVleet was a free agent back in 2020 on the [first iteration of this project](https://github.com/sumitrodatta/contract-prediction-2020/blob/master/contract-predict-markdown.pdf). Predictions came in at 4-years and \$93-97 million, and VanVleet ended up re-signing with the Raptors on a 4-year, \$85M contract with a player option on the final year. VanVleet was an All-Star in 2022, but also never shot better than 40.3% from the field in the past three years despite taking the second-most shots on the team.
+
 What I wanted to do was predict what contracts this year's free agent class might get based off previous offseasons. Stars generally get star-type money on account of there being a maximum contract; but in tiers below, contracts of comparable players usually come up in discussing contract value.
 
 # Methods/Analysis
@@ -439,6 +453,8 @@ knitr::include_graphics("Images/Win Shares Against First Year Salary.png")
 
 With a correlation coefficient of `r corr_ws_sal*100`%, win shares are highly correlated with first year cap percentage. This shouldn't be too groundbreaking: better players get paid more. The player with the highest Win Shares to not get a contract is Miles Bridges in 2022 at 7.2, who we covered earlier. The players with the lowest win shares to get a five-year contract are Bradley Beal & Luguentz Dort in 2022 with 1.4 Win Shares (Beal got a maximum contract at 35% of the salary cap, while Dort received 12.4%).
 
+\newpage
+
 Finally, let's see how many contracts of each length were given in each offseason.
 
 ```{r contracts_by_season, echo=FALSE, fig.align='center',out.width="100%"}
@@ -490,6 +506,8 @@ Compiling all the seasonal data in the previous graph, we see an average offseas
 rm(yrs_vs_sal,ws_vs_sal,contract_per_seas,contracts_by_years_signed,
    corr_ws_sal,free_agent_ws,contract_summary,avg_yr_contract_summary)
 ```
+
+\newpage
 
 ## Pre-Processing
 
@@ -686,11 +704,13 @@ I used a total of six models.
     -   costs interpretability as there is no tree diagram that is representative of the decisions made
 -   support vector machine model: attempt to separate classes with a hyperplane
     -   support vectors are the points closest to the hyperplane, named as such because the hyperplane would change if those points were removed
-    -   I believe this image from Wikipedia succinctly explains an SVM
+    -   I believe the following image from Wikipedia succinctly explains an SVM
 
-```{r svm_explain, out.width="50%", fig.align='center', fig.cap="H1 does not separate the classes. H2 does, but only with a small margin. H3 separates them with the maximal margin. By User:ZackWeinberg, based on PNG version by User:Cyc - This file was derived from: Svm separating hyperplanes.png, CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=22877598",echo=FALSE}
+```{r svm_explain, out.width="35%", fig.align='center', fig.cap="H1 does not separate the classes. H2 does, but only with a small margin. H3 separates them with the maximal margin. By User:ZackWeinberg, based on PNG version by User:Cyc - This file was derived from: Svm separating hyperplanes.png, CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=22877598",echo=FALSE}
 knitr::include_graphics("Images/SVM2.png")
 ```
+
+\newpage
 
 ### Predicting Years First, then Salary
 
@@ -800,6 +820,8 @@ prettify_vip(fit_y1_multinom,"Multinomial Y1 Model Variable Importance")
 
 The contract-year all-defense share dominates the variable importance, with the next best variable being less than 3% as important.
 
+\newpage
+
 Next up is the k-nearest neighbors model.
 
 ```{r knn_yrs_indep}
@@ -840,7 +862,7 @@ prettify_vip(fit_y1_tree,"Decision Tree Y1 Model Variable Importance")
 
 The individual contract-year components of the holistic advanced stat of win shares rank within the top-4 most important variables. Durability and availabilty are also highly desirable characteristics, as evidenced by the high values of contract-year minutes per game, contract-year games played percentage and last-3-years games played percentage.
 
-```{r decision_tree, echo=FALSE, fig.align='center',out.width="100%"}
+```{r decision_tree, echo=FALSE, fig.align='center',out.width="60%"}
 rpart.plot(pull_workflow_fit(fit_y1_tree)$fit,
                   roundint = FALSE,legend.x=NA,extra=0)
 ```
@@ -879,6 +901,8 @@ tune_forest %>% select_best() %>% gt()
 ```{r forest_y1__top_vars,echo=FALSE, fig.align='center',out.width="100%"}
 prettify_vip(fit_y1_forest,"Random Forest Y1 Model Variable Importance")
 ```
+
+\newpage
 
 Random forest variable importance has a more gradual decline than either decision tree or multinomial. The contract year versions of the holistic advanced stats are in the top 5 most important variables in the random forest model, with the other 2 spots taken by both versions of the games played percentage.
 
@@ -984,6 +1008,8 @@ tune_forest %>% select_best(metric="rmse") %>% gt()
 prettify_vip(fit_s2_forest,"Random Forest S2 Model Variable Importance")
 ```
 
+\newpage
+
 Like the linear model, contract years are by far the most important variable in the random forest model, although not to the same extent.
 
 ```{r svm_sal_dep}
@@ -1039,6 +1065,8 @@ fit_s1_lin=fit(wf,train_set)
 ```{r lin_s1_top_vars,echo=FALSE,fig.align='center',out.width="100%"}
 prettify_vip(fit_s1_lin,"Linear S1 Model Variable Importance")
 ```
+
+\newpage
 
 The most important factor is the type of free agent a player is. Once again, both versions of All-NBA voting share show up in the top 10.
 
@@ -1127,6 +1155,8 @@ fit_y2_multinom=fit(wf,train_set_after_s1)
 prettify_vip(fit_y2_multinom,"Multinomial Y2 Model Variable Importance")
 ```
 
+\newpage
+
 The multinomial years-second model essentially discards all other variables in favor of the predicted first-year-percent-of-cap variable. The two variables that are not less than 1% variable importance are all_nba_share_last_3_yrs (added this year) and percent_of_pos_vorp (added last year).
 
 ```{r knn_yrs_dep}
@@ -1163,10 +1193,12 @@ prettify_vip(fit_y2_tree,"Decision Tree Y2 Model Variable Importance")
 
 First-year-percent-of-cap shoots up to 1st in importance in the years-second decision tree, much like we saw in the years-second multinomial model. There's a second cluster of variables with importance between 45% and 55%.
 
-```{r decision_tree_dep, echo=FALSE, fig.align='center',out.width="100%"}
+```{r decision_tree_dep, echo=FALSE, fig.align='center',out.width="60%"}
 rpart.plot(pull_workflow_fit(fit_y2_tree)$fit,
                   roundint = FALSE,legend.x=NA,extra=0)
 ```
+
+\newpage
 
 The years-second decision tree still can't seem to figure out the division between 4- and 5-year contracts. It maximizes its prediction at 4 contract years if the first-year-percent-of-cap is greater than 11%.
 
@@ -1182,6 +1214,8 @@ wf=wf %>% finalize_workflow(tune_forest %>% select_best())
 fit_y2_forest=fit(wf,train_set_after_s1)
 tune_forest %>% select_best() %>% gt()
 ```
+
+\newpage
 
 ```{r forest_y2_top_vars,echo=FALSE, fig.align='center',out.width="100%"}
 prettify_vip(fit_y2_forest,"Random Forest Y2 Model Variable Importance")
@@ -1228,7 +1262,7 @@ rm(fit_s1_knn,fit_s1_lin,fit_s1_svm,
    y1_recipe,y2_recipe,s1_recipe,s2_recipe,wf,cv,models)
 ```
 
-## Results
+# Results
 
 Now it's time to run the models on the 2023 data.
 
@@ -1239,7 +1273,7 @@ anti_join(current_fa,three_year_rolling_stats_and_shares) %>%
   select(player,type) %>% gt()
 ```
 
-### Years First, Salary Second
+## Years First, Salary Second
 
 As a reminder, we're using a random forest as our years prediction, and using the mean of a random forest and SVM to predict salary.
 
@@ -1268,7 +1302,7 @@ eval_s2_predict=tibble(forest=eval_s2_predict_forest %>% pull(),
   mutate(m=(forest+svm)/2) %>% pull(m)
 ```
 
-### Salary First, Years Second
+## Salary First, Years Second
 
 For the S1Y2 model, we are using random forests as our salary prediction, and using the mean of a random forest and multinomial to predict years. One problem could happen in differing predictions between the two: a half-year average prediction (if one model predicts 3 years and another predicts 4 years, the average is 3.5 years, which does not make sense). We will tend to the optimistic side of prediction by rounding up any half-year predictions. Additionally, due to the rarity of 5-year contract predictions, if either model predicts a 5-year contract for a player, that will be the final prediction regardless of the other model's value.
 
@@ -1280,7 +1314,7 @@ eval_y2_predict=as.numeric(as.character(
   pull()))
 ```
 
-### Player Option Decisions and Selected Free Agents
+## Player Option Decisions and Selected Free Agents
 
 Before I look at which players might be accepting or declining their option and then some selected high-profile free agents, let's look at the distribution of contract years.
 
@@ -1294,6 +1328,7 @@ results<-eval_set %>%
 ```
 
 ```{r yrs_dist,echo=FALSE,results='asis'}
+#| layout-ncol: 2
 results %>% group_by(yrs_Y1S2) %>% tally() %>% gt()
 results %>% group_by(yrs_S1Y2) %>% tally() %>% gt()
 ```
@@ -1312,6 +1347,7 @@ results_mins_conversion=results %>%
 ```
 
 ```{r yrs_dist_corrected,echo=FALSE, results='asis'}
+#| layout-ncol: 2
 results_mins_conversion %>% group_by(yrs_Y1S2) %>% tally() %>% gt()
 results_mins_conversion %>% group_by(yrs_S1Y2) %>% tally() %>% gt()
 ```
@@ -1338,7 +1374,7 @@ final_results=results_mins_conversion %>%
                digits=-4))
 ```
 
-#### Player Option Decisions
+### Player Option Decisions
 
 ```{r gt_format_for_pdf,include=FALSE}
 fa_table_format<-function(df,options=TRUE){
@@ -1380,7 +1416,7 @@ fa_table_format(options_decisions %>%
 
 Kenyon Martin Jr and Xavier Tillman Sr are in the same boat, as 2020 second round picks who signed 3-year deals (coincidentally, both were picked by the Sacramento Kings and traded to the Rockets & Grizzlies respectively). Their teams could pick up the option, but would make the players unrestricted free agents in 2024. The Rockets are intimately familiar with the process, as they declined Jae'Sean Tate's option last year to re-sign him to a [3-year, \$22.1M contract](https://rocketswire.usatoday.com/2022/06/30/rockets-re-sign-jaesean-tate-for-three-years-22-1-million/) (I had him pegged for a 2-year, \$16.7M contract). The Pelicans have a somewhat easier decision with Herb Jones, as he'd still be a restricted free agent in 2024 if the team picks up his option.
 
-#### Selected Free Agents
+### Selected Free Agents
 
 ```{r non_option_contracts,echo=FALSE}
 non_options=anti_join(final_results,current_fa_options %>% select(player)) %>%
@@ -1405,6 +1441,8 @@ fa_table_format(non_options %>% filter(type=="RFA") %>% select(-type) %>% slice(
 ```
 
 The young Chicago Bulls guards (White & Dosunmu) have similar cap percentage projections, with Dosunmu getting more under Y1S2 and White getting more under S1Y2. Thybulle made the All-Defensive Second Team in 2021 & 2022, but his offensive limitations led the Sixers to trade him to the Trail Blazers for a 2029 2nd-round pick. Hachimura's another example of someone who'll get more than projected; at the very least, his qualifying offer is for \$8.5 million. Hachimura performed relatively well next to LeBron James in the bright lights of LA as the Lakers made a run to the Western Conference Finals (reminder that the models do not take into account playoff stats).
+
+\newpage
 
 On to the unrestricted free agents.
 
@@ -1441,3 +1479,16 @@ saveRDS(fit_s2_svm,"Output Data/S2 SVM.rds")
 saveRDS(fit_s1_forest,"Output Data/S1 Forest.rds")
 saveRDS(fit_y2_forest,"Output Data/Y2 Forest.rds")
 ```
+
+# Conclusion
+
+Using a combination of contract year & last-three-years stats and end-of-season all-league voting share, we set out to predict NBA free agent contracts for the 2023 offseason. Since we had correlated targets in contract length and first year percent of salary cap, we predicted one target first and used its predictions as an input for the second target. The contract years were predicted as a classification problem, while the salary was predicted as a regression model. We used six models: linear (for salary) & multinomial (for contract length) as baselines, k-nearest-neighbors, decision tree (only for predicting contract length), a random forest and a support vector machine. Kristaps Porzingis, Fred VanVleet, Kyrie Irving, Nikola Vucevic, Jerami Grant and Brook Lopez are all projected to get above \$100 million in total contract value in at least one method.
+
+The models suffer from being unable to quantify intangibles like playing reputation, team fit, within-season role changes, or willingness to take a reduced salary to be on a championship contender. The models also can't determine which team will sign which player. That highly depends on a sequence of events: if Team A signs this player, they don't have enough money to resign Player B, who then goes to Team C for less money, etc.
+
+Perhaps I should have implemented a time factor or weighted recent years more heavily, as team decision makers may have gotten smarter. I didn't remove highly correlated predictors by design, as I wanted the models themselves to perform feature selection and determine what the most important variables were.
+
+Future work could include trying more models, like boosting (in which models are added sequentially, with later models in the sequence attempting to correct the errors of earlier models). Another example might be adding a draft pedigree variable, as teams might be more willing to:
+
+A.  take a chance on a player with mediocre surface-level stats, as the team could believe the player was misused and the inherent talent is still there
+B.  pay up for a player with good stats, as the high pick of the player could signal to the player's higher potential
